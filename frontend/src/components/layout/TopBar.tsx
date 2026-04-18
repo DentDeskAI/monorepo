@@ -3,19 +3,28 @@ import { Bell } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { initials } from '@/lib/utils'
 
-const ROUTE_TITLES: Record<string, string> = {
-  '/':          'Дашборд',
-  '/dialogs':   'Диалоги',
-  '/calendar':  'Календарь',
-  '/patients':  'Пациенты',
-  '/settings':  'Настройки',
+const ROUTE_TITLES = {
+  dashboard: 'Дашборд',
+  dialogs: 'Диалоги',
+  calendar: 'Календарь',
+  patients: 'Пациенты',
+  settings: 'Настройки',
+}
+
+function resolveTitle(pathname: string) {
+  if (pathname === '/app' || pathname === '/app/') return ROUTE_TITLES.dashboard
+  if (pathname.startsWith('/app/dialogs')) return ROUTE_TITLES.dialogs
+  if (pathname.startsWith('/app/calendar')) return ROUTE_TITLES.calendar
+  if (pathname.startsWith('/app/patients')) return ROUTE_TITLES.patients
+  if (pathname.startsWith('/app/settings')) return ROUTE_TITLES.settings
+  return 'DentDesk'
 }
 
 export function TopBar() {
   const { pathname } = useLocation()
   const user = useAuth((s) => s.user)
 
-  const title = ROUTE_TITLES[pathname] ?? 'DentDesk'
+  const title = resolveTitle(pathname)
 
   return (
     <header

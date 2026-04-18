@@ -16,7 +16,7 @@ export function LoginPage() {
     e.preventDefault()
     try {
       await login({ email, password })
-      navigate('/')
+      navigate('/app')
     } catch {
       toast.error('Неверный email или пароль')
     }

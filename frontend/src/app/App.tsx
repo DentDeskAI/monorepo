@@ -11,6 +11,7 @@ import { DialogsPage }   from '@/features/dialogs/DialogsPage'
 import { CalendarPage }  from '@/features/calendar/CalendarPage'
 import { PatientsPage }  from '@/features/patients/PatientsPage'
 import { LoginPage }     from '@/features/auth/LoginPage'
+import { LandingPage }   from '@/features/landing/LandingPage'
 
 // ─── Auth guard ───────────────────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function GuestOnly({ children }: { children: React.ReactNode }) {
   const user = useAuth((s) => s.user)
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/app" replace />
   return <>{children}</>
 }
 
@@ -30,6 +31,7 @@ function GuestOnly({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const init = useAuth((s) => s.init)
+  const user = useAuth((s) => s.user)
 
   // Rehydrate auth state from localStorage on first render
   useEffect(() => { init() }, [init])
@@ -38,6 +40,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public routes */}
+        <Route path="/" element={<LandingPage />} />
         <Route
           path="/login"
           element={
@@ -49,6 +52,7 @@ export default function App() {
 
         {/* Protected routes — wrapped in AppShell (sidebar + topbar) */}
         <Route
+          path="/app"
           element={
             <RequireAuth>
               <AppShell />
@@ -60,10 +64,11 @@ export default function App() {
           <Route path="calendar"    element={<CalendarPage />} />
           <Route path="patients"    element={<PatientsPage />} />
           <Route path="patients/:id" element={<PatientsPage />} />
+          <Route path="*" element={<Navigate to="/app" replace />} />
         </Route>
 
         {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={user ? '/app' : '/'} replace />} />
       </Routes>
     </BrowserRouter>
   )

@@ -18,10 +18,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Дашборд',   to: '/',         icon: LayoutDashboard },
-  { label: 'Диалоги',   to: '/dialogs',  icon: MessageSquare   },
-  { label: 'Календарь', to: '/calendar', icon: CalendarDays    },
-  { label: 'Пациенты',  to: '/patients', icon: Users           },
+  { label: 'Дашборд',   to: '/app',          icon: LayoutDashboard },
+  { label: 'Диалоги',   to: '/app/dialogs',  icon: MessageSquare   },
+  { label: 'Календарь', to: '/app/calendar', icon: CalendarDays    },
+  { label: 'Пациенты',  to: '/app/patients', icon: Users           },
 ]
 
 export function Sidebar() {
@@ -57,7 +57,7 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/'}
+            end={item.to === '/app'}
             className={({ isActive }) =>
               cn('sidebar-link', isActive && 'active')
             }
@@ -71,7 +71,7 @@ export function Sidebar() {
       {/* ── Bottom actions ── */}
       <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
         <NavLink
-          to="/settings"
+          to="/app/settings"
           className={({ isActive }) => cn('sidebar-link', isActive && 'active')}
         >
           <Settings className="w-4 h-4 flex-shrink-0" />
