@@ -20,7 +20,18 @@ func NewAppointmentHandler(svc *service.AppointmentService) *AppointmentHandler 
 }
 
 // List godoc
-// GET /api/v1/appointments?date_from=2025-01-01&date_to=2025-01-31&doctor_id=...
+// @Summary List appointments
+// @Description Returns appointments for the authenticated clinic with optional date range filter.
+// @Tags appointments
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number" default(1)
+// @Param page_size query int false "Page size" default(50)
+// @Param date_from query string false "Start date (YYYY-MM-DD)"
+// @Param date_to query string false "End date (YYYY-MM-DD)"
+// @Success 200 {object} AppointmentListResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /appointments [get]
 func (h *AppointmentHandler) List(c *gin.Context) {
 	clinicID := middleware.ClinicIDFromCtx(c)
 
@@ -46,7 +57,16 @@ func (h *AppointmentHandler) List(c *gin.Context) {
 }
 
 // Get godoc
-// GET /api/v1/appointments/:id
+// @Summary Get appointment
+// @Description Returns an appointment by ID for the authenticated clinic.
+// @Tags appointments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Appointment ID (UUID)"
+// @Success 200 {object} AppointmentDTO
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /appointments/{id} [get]
 func (h *AppointmentHandler) Get(c *gin.Context) {
 	clinicID, apptID, ok := clinicAndResourceID(c)
 	if !ok {
@@ -63,7 +83,16 @@ func (h *AppointmentHandler) Get(c *gin.Context) {
 }
 
 // Create godoc
-// POST /api/v1/appointments
+// @Summary Create appointment
+// @Description Creates a new appointment in the authenticated clinic.
+// @Tags appointments
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body service.CreateAppointmentRequest true "Appointment payload"
+// @Success 201 {object} AppointmentDTO
+// @Failure 400 {object} ErrorResponse
+// @Router /appointments [post]
 func (h *AppointmentHandler) Create(c *gin.Context) {
 	clinicID := middleware.ClinicIDFromCtx(c)
 
@@ -83,7 +112,17 @@ func (h *AppointmentHandler) Create(c *gin.Context) {
 }
 
 // Update godoc
-// PUT /api/v1/appointments/:id
+// @Summary Update appointment
+// @Description Updates an existing appointment by ID.
+// @Tags appointments
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Appointment ID (UUID)"
+// @Param request body service.UpdateAppointmentRequest true "Appointment update payload"
+// @Success 200 {object} AppointmentDTO
+// @Failure 400 {object} ErrorResponse
+// @Router /appointments/{id} [put]
 func (h *AppointmentHandler) Update(c *gin.Context) {
 	clinicID, apptID, ok := clinicAndResourceID(c)
 	if !ok {
@@ -106,7 +145,16 @@ func (h *AppointmentHandler) Update(c *gin.Context) {
 }
 
 // Delete godoc
-// DELETE /api/v1/appointments/:id
+// @Summary Delete appointment
+// @Description Deletes an appointment by ID.
+// @Tags appointments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Appointment ID (UUID)"
+// @Success 204
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /appointments/{id} [delete]
 func (h *AppointmentHandler) Delete(c *gin.Context) {
 	clinicID, apptID, ok := clinicAndResourceID(c)
 	if !ok {

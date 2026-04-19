@@ -6,17 +6,25 @@ import (
 
 	"github.com/dentdesk/backend/internal/handler"
 	"github.com/dentdesk/backend/internal/middleware"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Setup registers all routes on the provided Gin engine.
 func Setup(
 	r *gin.Engine,
 	jwtSecret string,
-	authH      *handler.AuthHandler,
-	patientH   *handler.PatientHandler,
-	apptH      *handler.AppointmentHandler,
-	waH        *handler.WhatsAppHandler,
+	authH *handler.AuthHandler,
+	patientH *handler.PatientHandler,
+	apptH *handler.AppointmentHandler,
+	waH *handler.WhatsAppHandler,
 ) {
+	// ─── Docs/Swagger  ─────────────────────────────────────────────────────────
+	r.GET("/docs", func(c *gin.Context) {
+		c.Redirect(302, "/docs/index.html")
+	})
+	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// ─── Health check ─────────────────────────────────────────────────────────
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})

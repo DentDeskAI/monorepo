@@ -1,5 +1,15 @@
 // DentDesk — SaaS platform for dental clinics.
 // Entry point: wires config → DB → repositories → services → handlers → routes.
+
+// @title DentDesk API
+// @version 1.0
+// @description API documentation
+// @host localhost:18080
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
 package main
 
 import (
@@ -27,6 +37,8 @@ import (
 	"github.com/dentdesk/backend/internal/service"
 	"github.com/dentdesk/backend/internal/whatsapp"
 	"github.com/dentdesk/backend/migrations"
+
+	_ "github.com/dentdesk/backend/cmd/docs"
 )
 
 func main() {
@@ -61,11 +73,11 @@ func main() {
 	}
 
 	// ─── Repositories ─────────────────────────────────────────────────────────
-	clinicRepo  := repository.NewClinicRepository(db)
-	userRepo    := repository.NewUserRepository(db)
+	clinicRepo := repository.NewClinicRepository(db)
+	userRepo := repository.NewUserRepository(db)
 	patientRepo := repository.NewPatientRepository(db)
-	apptRepo    := repository.NewAppointmentRepository(db)
-	msgRepo     := repository.NewMessageLogRepository(db)
+	apptRepo := repository.NewAppointmentRepository(db)
+	msgRepo := repository.NewMessageLogRepository(db)
 
 	// ─── External clients ─────────────────────────────────────────────────────
 	waClient := whatsapp.NewClient(
@@ -82,16 +94,16 @@ func main() {
 	)
 
 	// ─── Services ─────────────────────────────────────────────────────────────
-	authSvc    := service.NewAuthService(userRepo, clinicRepo, cfg.JWT)
+	authSvc := service.NewAuthService(userRepo, clinicRepo, cfg.JWT)
 	patientSvc := service.NewPatientService(patientRepo)
-	apptSvc    := service.NewAppointmentService(apptRepo)
-	waSvc      := service.NewWhatsAppService(msgRepo, patientRepo, clinicRepo, waClient, llmClient)
+	apptSvc := service.NewAppointmentService(apptRepo)
+	waSvc := service.NewWhatsAppService(msgRepo, patientRepo, clinicRepo, waClient, llmClient)
 
 	// ─── Handlers ─────────────────────────────────────────────────────────────
-	authH    := handler.NewAuthHandler(authSvc)
+	authH := handler.NewAuthHandler(authSvc)
 	patientH := handler.NewPatientHandler(patientSvc)
-	apptH    := handler.NewAppointmentHandler(apptSvc)
-	waH      := handler.NewWhatsAppHandler(waSvc, cfg.WhatsApp.VerifyToken)
+	apptH := handler.NewAppointmentHandler(apptSvc)
+	waH := handler.NewWhatsAppHandler(waSvc, cfg.WhatsApp.VerifyToken)
 
 	// ─── HTTP server ──────────────────────────────────────────────────────────
 	r := gin.New()

@@ -29,11 +29,20 @@ func NewWhatsAppHandler(waService *service.WhatsAppService, verifyToken string) 
 	}
 }
 
-// Verify handles GET /webhook/whatsapp — required for Meta's webhook registration.
-// Meta sends hub.challenge which we must echo back to verify ownership.
+// Verify godoc
+// @Summary Verify WhatsApp webhook
+// @Description Meta webhook verification challenge endpoint.
+// @Tags webhook
+// @Produce plain
+// @Param hub.mode query string true "Verification mode"
+// @Param hub.verify_token query string true "Verification token"
+// @Param hub.challenge query string true "Challenge string"
+// @Success 200 {string} string
+// @Failure 403 {object} ErrorResponse
+// @Router /webhook/whatsapp [get]
 func (h *WhatsAppHandler) Verify(c *gin.Context) {
-	mode      := c.Query("hub.mode")
-	token     := c.Query("hub.verify_token")
+	mode := c.Query("hub.mode")
+	token := c.Query("hub.verify_token")
 	challenge := c.Query("hub.challenge")
 
 	if mode == "subscribe" && token == h.verifyToken {
@@ -50,10 +59,15 @@ func (h *WhatsAppHandler) Verify(c *gin.Context) {
 	c.JSON(http.StatusForbidden, gin.H{"error": "verification failed"})
 }
 
-// Receive handles POST /webhook/whatsapp — processes inbound events.
-// NOTE: The webhook endpoint is intentionally NOT behind TenantMiddleware
-// because incoming messages arrive without a JWT. Tenant resolution happens
-// inside the service layer by matching the phone_number_id to a clinic.
+// Receive godoc
+// @Summary Receive WhatsApp webhook events
+// @Description Accepts inbound WhatsApp events from Meta and acknowledges immediately.
+// @Tags webhook
+// @Accept json
+// @Produce json
+// @Param payload body whatsapp.WebhookPayload true "Webhook payload"
+// @Success 200
+// @Router /webhook/whatsapp [post]
 func (h *WhatsAppHandler) Receive(c *gin.Context) {
 	var payload whatsapp.WebhookPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -70,14 +84,24 @@ func (h *WhatsAppHandler) Receive(c *gin.Context) {
 	go h.processPayload(c.Copy(), payload)
 }
 
-type sendManualRequest struct {
+type SendManualRequest struct {
 	PatientID string `json:"patient_id" binding:"required"`
 	Body      string `json:"body" binding:"required"`
 }
 
-// SendManual handles POST /api/v1/messages/send — staff sends a message to a patient.
+// SendManual godoc
+// @Summary Send manual WhatsApp message
+// @Description Sends a staff-initiated WhatsApp message to a patient.
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body SendManualRequest true "Manual message payload"
+// @Success 200 {object} StatusResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /messages/send [post]
 func (h *WhatsAppHandler) SendManual(c *gin.Context) {
-	var req sendManualRequest
+	var req SendManualRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -134,8 +158,8 @@ func (h *WhatsAppHandler) handleInboundMessage(
 	contacts []whatsapp.Contact,
 ) {
 	senderName := resolveContactName(contacts, msg.From)
-	body       := resolveMessageBody(msg)
-	ts         := parseTimestamp(msg.Timestamp)
+	body := resolveMessageBody(msg)
+	ts := parseTimestamp(msg.Timestamp)
 
 	logger := log.With().
 		Str("from", msg.From).

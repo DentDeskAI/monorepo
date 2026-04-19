@@ -21,10 +21,19 @@ func NewPatientHandler(svc *service.PatientService) *PatientHandler {
 }
 
 // List godoc
-// GET /api/v1/patients?page=1&page_size=20
+// @Summary List patients
+// @Description Returns paginated patients for the authenticated clinic.
+// @Tags patients
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number" default(1)
+// @Param page_size query int false "Page size" default(20)
+// @Success 200 {object} PatientListResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /patients [get]
 func (h *PatientHandler) List(c *gin.Context) {
 	clinicID := middleware.ClinicIDFromCtx(c)
-	page     := queryInt(c, "page", 1)
+	page := queryInt(c, "page", 1)
 	pageSize := queryInt(c, "page_size", 20)
 
 	patients, total, err := h.svc.List(c.Request.Context(), clinicID, page, pageSize)
@@ -42,7 +51,16 @@ func (h *PatientHandler) List(c *gin.Context) {
 }
 
 // Get godoc
-// GET /api/v1/patients/:id
+// @Summary Get patient
+// @Description Returns a patient by ID for the authenticated clinic.
+// @Tags patients
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Patient ID (UUID)"
+// @Success 200 {object} PatientDTO
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /patients/{id} [get]
 func (h *PatientHandler) Get(c *gin.Context) {
 	clinicID, patientID, ok := clinicAndResourceID(c)
 	if !ok {
@@ -59,7 +77,16 @@ func (h *PatientHandler) Get(c *gin.Context) {
 }
 
 // Create godoc
-// POST /api/v1/patients
+// @Summary Create patient
+// @Description Creates a new patient in the authenticated clinic.
+// @Tags patients
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body service.CreatePatientRequest true "Patient payload"
+// @Success 201 {object} PatientDTO
+// @Failure 400 {object} ErrorResponse
+// @Router /patients [post]
 func (h *PatientHandler) Create(c *gin.Context) {
 	clinicID := middleware.ClinicIDFromCtx(c)
 
@@ -79,7 +106,17 @@ func (h *PatientHandler) Create(c *gin.Context) {
 }
 
 // Update godoc
-// PUT /api/v1/patients/:id
+// @Summary Update patient
+// @Description Updates an existing patient by ID.
+// @Tags patients
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Patient ID (UUID)"
+// @Param request body service.UpdatePatientRequest true "Patient update payload"
+// @Success 200 {object} PatientDTO
+// @Failure 400 {object} ErrorResponse
+// @Router /patients/{id} [put]
 func (h *PatientHandler) Update(c *gin.Context) {
 	clinicID, patientID, ok := clinicAndResourceID(c)
 	if !ok {
@@ -102,7 +139,16 @@ func (h *PatientHandler) Update(c *gin.Context) {
 }
 
 // Delete godoc
-// DELETE /api/v1/patients/:id
+// @Summary Delete patient
+// @Description Deletes a patient by ID.
+// @Tags patients
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Patient ID (UUID)"
+// @Success 204
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /patients/{id} [delete]
 func (h *PatientHandler) Delete(c *gin.Context) {
 	clinicID, patientID, ok := clinicAndResourceID(c)
 	if !ok {

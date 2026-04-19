@@ -1,0 +1,954 @@
+basePath: /api/v1
+definitions:
+  domain.Appointment:
+    properties:
+      clinic_id:
+        description: Multi-tenancy key
+        type: string
+      created_at:
+        type: string
+      doctor:
+        $ref: '#/definitions/domain.Doctor'
+      doctor_id:
+        type: string
+      ends_at:
+        type: string
+      id:
+        type: string
+      notes:
+        type: string
+      patient:
+        $ref: '#/definitions/domain.Patient'
+      patient_id:
+        type: string
+      reminder_sent_at:
+        description: Reminders
+        type: string
+      starts_at:
+        type: string
+      status:
+        $ref: '#/definitions/domain.AppointmentStatus'
+      title:
+        description: procedure description
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.AppointmentStatus:
+    enum:
+    - scheduled
+    - confirmed
+    - in_progress
+    - completed
+    - cancelled
+    - no_show
+    type: string
+    x-enum-varnames:
+    - AppointmentStatusScheduled
+    - AppointmentStatusConfirmed
+    - AppointmentStatusInProgress
+    - AppointmentStatusCompleted
+    - AppointmentStatusCancelled
+    - AppointmentStatusNoShow
+  domain.Doctor:
+    properties:
+      avatar_url:
+        type: string
+      clinic_id:
+        description: Multi-tenancy key
+        type: string
+      color:
+        description: hex, used in calendar
+        type: string
+      created_at:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      speciality:
+        description: e.g. "Orthodontics"
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        description: Optional link to a User account for portal access
+        type: string
+    type: object
+  domain.Patient:
+    properties:
+      clinic_id:
+        description: Multi-tenancy key — always included in WHERE clauses
+        type: string
+      created_at:
+        type: string
+      date_of_birth:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      gender:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      notes:
+        type: string
+      phone:
+        description: WhatsApp contact
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.UserRole:
+    enum:
+    - admin
+    - receptionist
+    - doctor
+    type: string
+    x-enum-varnames:
+    - RoleAdmin
+    - RoleReceptionist
+    - RoleDoctor
+  handler.AppointmentDTO:
+    properties:
+      clinic_id:
+        description: Multi-tenancy key
+        type: string
+      created_at:
+        type: string
+      doctor:
+        $ref: '#/definitions/domain.Doctor'
+      doctor_id:
+        type: string
+      ends_at:
+        type: string
+      id:
+        type: string
+      notes:
+        type: string
+      patient:
+        $ref: '#/definitions/domain.Patient'
+      patient_id:
+        type: string
+      reminder_sent_at:
+        description: Reminders
+        type: string
+      starts_at:
+        type: string
+      status:
+        $ref: '#/definitions/domain.AppointmentStatus'
+      title:
+        description: procedure description
+        type: string
+      updated_at:
+        type: string
+    type: object
+  handler.AppointmentListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.Appointment'
+        type: array
+    type: object
+  handler.ErrorResponse:
+    properties:
+      error:
+        example: invalid request
+        type: string
+    type: object
+  handler.PatientDTO:
+    properties:
+      clinic_id:
+        description: Multi-tenancy key — always included in WHERE clauses
+        type: string
+      created_at:
+        type: string
+      date_of_birth:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      gender:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      notes:
+        type: string
+      phone:
+        description: WhatsApp contact
+        type: string
+      updated_at:
+        type: string
+    type: object
+  handler.PatientListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.Patient'
+        type: array
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 20
+        type: integer
+      total:
+        example: 42
+        type: integer
+    type: object
+  handler.SendManualRequest:
+    properties:
+      body:
+        type: string
+      patient_id:
+        type: string
+    required:
+    - body
+    - patient_id
+    type: object
+  handler.StatusResponse:
+    properties:
+      status:
+        example: sent
+        type: string
+    type: object
+  service.AuthResponse:
+    properties:
+      expires_at:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/service.UserDTO'
+    type: object
+  service.CreateAppointmentRequest:
+    properties:
+      doctor_id:
+        type: string
+      ends_at:
+        type: string
+      notes:
+        type: string
+      patient_id:
+        type: string
+      starts_at:
+        description: RFC3339
+        type: string
+      title:
+        type: string
+    required:
+    - doctor_id
+    - ends_at
+    - patient_id
+    - starts_at
+    type: object
+  service.CreatePatientRequest:
+    properties:
+      date_of_birth:
+        description: '"YYYY-MM-DD"'
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      gender:
+        type: string
+      last_name:
+        type: string
+      notes:
+        type: string
+      phone:
+        type: string
+    required:
+    - first_name
+    - last_name
+    - phone
+    type: object
+  service.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  service.RegisterRequest:
+    properties:
+      clinic_name:
+        minLength: 2
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - clinic_name
+    - email
+    - first_name
+    - password
+    type: object
+  service.UpdateAppointmentRequest:
+    properties:
+      ends_at:
+        type: string
+      notes:
+        type: string
+      starts_at:
+        type: string
+      status:
+        $ref: '#/definitions/domain.AppointmentStatus'
+      title:
+        type: string
+    type: object
+  service.UpdatePatientRequest:
+    properties:
+      date_of_birth:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      gender:
+        type: string
+      last_name:
+        type: string
+      notes:
+        type: string
+      phone:
+        type: string
+    type: object
+  service.UserDTO:
+    properties:
+      clinic_id:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      role:
+        $ref: '#/definitions/domain.UserRole'
+    type: object
+  whatsapp.Change:
+    properties:
+      field:
+        type: string
+      value:
+        $ref: '#/definitions/whatsapp.ChangeValue'
+    type: object
+  whatsapp.ChangeValue:
+    properties:
+      contacts:
+        items:
+          $ref: '#/definitions/whatsapp.Contact'
+        type: array
+      messages:
+        items:
+          $ref: '#/definitions/whatsapp.InboundMessage'
+        type: array
+      messaging_product:
+        type: string
+      metadata:
+        $ref: '#/definitions/whatsapp.Metadata'
+      statuses:
+        items:
+          $ref: '#/definitions/whatsapp.StatusUpdate'
+        type: array
+    type: object
+  whatsapp.Contact:
+    properties:
+      profile:
+        $ref: '#/definitions/whatsapp.Profile'
+      wa_id:
+        type: string
+    type: object
+  whatsapp.Conversation:
+    properties:
+      id:
+        type: string
+      origin:
+        $ref: '#/definitions/whatsapp.Origin'
+    type: object
+  whatsapp.Entry:
+    properties:
+      changes:
+        items:
+          $ref: '#/definitions/whatsapp.Change'
+        type: array
+      id:
+        type: string
+    type: object
+  whatsapp.InboundMessage:
+    properties:
+      audio:
+        $ref: '#/definitions/whatsapp.MediaContent'
+      context:
+        allOf:
+        - $ref: '#/definitions/whatsapp.MessageContext'
+        description: present if reply to another message
+      document:
+        $ref: '#/definitions/whatsapp.MediaContent'
+      from:
+        description: sender's phone number (E.164 without +)
+        type: string
+      id:
+        description: wamid — stable Meta message ID
+        type: string
+      image:
+        $ref: '#/definitions/whatsapp.MediaContent'
+      text:
+        $ref: '#/definitions/whatsapp.TextContent'
+      timestamp:
+        description: Unix epoch as string
+        type: string
+      type:
+        description: text | image | audio | document | ...
+        type: string
+    type: object
+  whatsapp.MediaContent:
+    properties:
+      caption:
+        type: string
+      id:
+        type: string
+      mime_type:
+        type: string
+      sha256:
+        type: string
+    type: object
+  whatsapp.MessageContext:
+    properties:
+      from:
+        type: string
+      id:
+        type: string
+    type: object
+  whatsapp.Metadata:
+    properties:
+      display_phone_number:
+        type: string
+      phone_number_id:
+        type: string
+    type: object
+  whatsapp.Origin:
+    properties:
+      type:
+        description: business_initiated | user_initiated
+        type: string
+    type: object
+  whatsapp.Profile:
+    properties:
+      name:
+        type: string
+    type: object
+  whatsapp.StatusUpdate:
+    properties:
+      conversation:
+        $ref: '#/definitions/whatsapp.Conversation'
+      id:
+        type: string
+      recipient_id:
+        type: string
+      status:
+        description: sent | delivered | read | failed
+        type: string
+      timestamp:
+        type: string
+    type: object
+  whatsapp.TextContent:
+    properties:
+      body:
+        type: string
+    type: object
+  whatsapp.WebhookPayload:
+    properties:
+      entry:
+        items:
+          $ref: '#/definitions/whatsapp.Entry'
+        type: array
+      object:
+        type: string
+    type: object
+host: localhost:18080
+info:
+  contact: {}
+  description: API documentation
+  title: DentDesk API
+  version: "1.0"
+paths:
+  /appointments:
+    get:
+      description: Returns appointments for the authenticated clinic with optional
+        date range filter.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: date_from
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AppointmentListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List appointments
+      tags:
+      - appointments
+    post:
+      consumes:
+      - application/json
+      description: Creates a new appointment in the authenticated clinic.
+      parameters:
+      - description: Appointment payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.CreateAppointmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.AppointmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create appointment
+      tags:
+      - appointments
+  /appointments/{id}:
+    delete:
+      description: Deletes an appointment by ID.
+      parameters:
+      - description: Appointment ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete appointment
+      tags:
+      - appointments
+    get:
+      description: Returns an appointment by ID for the authenticated clinic.
+      parameters:
+      - description: Appointment ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AppointmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get appointment
+      tags:
+      - appointments
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing appointment by ID.
+      parameters:
+      - description: Appointment ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Appointment update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.UpdateAppointmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AppointmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update appointment
+      tags:
+      - appointments
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates user credentials and returns a JWT.
+      parameters:
+      - description: Login payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/service.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Login user
+      tags:
+      - auth
+  /auth/me:
+    get:
+      description: Returns profile data of the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/service.UserDTO'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Current user profile
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a clinic and its first admin user, then returns a JWT.
+      parameters:
+      - description: Registration payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/service.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Register clinic admin
+      tags:
+      - auth
+  /messages/send:
+    post:
+      consumes:
+      - application/json
+      description: Sends a staff-initiated WhatsApp message to a patient.
+      parameters:
+      - description: Manual message payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SendManualRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Send manual WhatsApp message
+      tags:
+      - messages
+  /patients:
+    get:
+      description: Returns paginated patients for the authenticated clinic.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PatientListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List patients
+      tags:
+      - patients
+    post:
+      consumes:
+      - application/json
+      description: Creates a new patient in the authenticated clinic.
+      parameters:
+      - description: Patient payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.CreatePatientRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.PatientDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create patient
+      tags:
+      - patients
+  /patients/{id}:
+    delete:
+      description: Deletes a patient by ID.
+      parameters:
+      - description: Patient ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete patient
+      tags:
+      - patients
+    get:
+      description: Returns a patient by ID for the authenticated clinic.
+      parameters:
+      - description: Patient ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PatientDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get patient
+      tags:
+      - patients
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing patient by ID.
+      parameters:
+      - description: Patient ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Patient update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.UpdatePatientRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PatientDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update patient
+      tags:
+      - patients
+  /webhook/whatsapp:
+    get:
+      description: Meta webhook verification challenge endpoint.
+      parameters:
+      - description: Verification mode
+        in: query
+        name: hub.mode
+        required: true
+        type: string
+      - description: Verification token
+        in: query
+        name: hub.verify_token
+        required: true
+        type: string
+      - description: Challenge string
+        in: query
+        name: hub.challenge
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Verify WhatsApp webhook
+      tags:
+      - webhook
+    post:
+      consumes:
+      - application/json
+      description: Accepts inbound WhatsApp events from Meta and acknowledges immediately.
+      parameters:
+      - description: Webhook payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/whatsapp.WebhookPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Receive WhatsApp webhook events
+      tags:
+      - webhook
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
