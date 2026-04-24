@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+FROM golang:1.22-alpine AS builder
+WORKDIR /src
+
+COPY go.mod ./
+RUN go mod download || true
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/worker ./cmd/worker
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata && \
+    cp /usr/share/zoneinfo/Asia/Almaty /etc/localtime && \
+    echo "Asia/Almaty" > /etc/timezone
+WORKDIR /app
+COPY --from=builder /out/worker /app/worker
+ENTRYPOINT ["/app/worker"]

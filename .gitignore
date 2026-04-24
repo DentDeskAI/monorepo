@@ -1,0 +1,18 @@
+# env (never commit secrets)
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# Go build artifacts
+/out/
+*.exe
+
+# Node
+web/node_modules/
+web/dist/
+
+# Docker volumes / OS
+.DS_Store
+.claude/
