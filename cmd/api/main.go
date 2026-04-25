@@ -38,6 +38,7 @@ import (
 	redisx "github.com/dentdesk/dentdesk/internal/platform/redis"
 	"github.com/dentdesk/dentdesk/internal/realtime"
 	"github.com/dentdesk/dentdesk/internal/scheduler"
+	"github.com/dentdesk/dentdesk/internal/services"
 	"github.com/dentdesk/dentdesk/internal/whatsapp"
 )
 
@@ -127,29 +128,17 @@ func main() {
 
 	// --- Auth ---
 	authSvc := auth.NewService(database, cfg.JWTSecret)
+	adminSvc := services.NewAdminService(authSvc, clinicsRepo)
+	resourceSvc := services.NewResourceService(doctorsRepo, chairsRepo, patientsRepo)
+	schedulingSvc := services.NewSchedulingService(apptRepo, convRepo, sched)
+	crmSvc := services.NewCRMService(database, patientsRepo, convRepo, apptRepo, doctorsRepo, hub, waClient)
 
 	// --- Handlers ---
 	authH := &handlers.AuthHandler{Svc: authSvc}
-	adminH := &handlers.AdminHandler{Auth: authSvc, Clinics: clinicsRepo}
-	crmH := &handlers.CRMHandler{
-		DB:            database,
-		Patients:      patientsRepo,
-		Conversations: convRepo,
-		Appointments:  apptRepo,
-		Doctors:       doctorsRepo,
-		Hub:           hub,
-		WhatsApp:      waClient,
-	}
-	resourceH := &handlers.ResourceHandler{
-		Doctors:  doctorsRepo,
-		Chairs:   chairsRepo,
-		Patients: patientsRepo,
-	}
-	scheduleH := &handlers.SchedulingHandler{
-		Appointments:  apptRepo,
-		Conversations: convRepo,
-		Scheduler:     sched,
-	}
+	adminH := &handlers.AdminHandler{Svc: adminSvc}
+	crmH := &handlers.CRMHandler{Svc: crmSvc}
+	resourceH := &handlers.ResourceHandler{Svc: resourceSvc}
+	scheduleH := &handlers.SchedulingHandler{Svc: schedulingSvc}
 	waH := &handlers.WhatsAppHandler{
 		DB:            database,
 		Redis:         redisClient,
