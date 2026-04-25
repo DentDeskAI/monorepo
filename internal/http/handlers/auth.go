@@ -16,10 +16,21 @@ type AuthHandler struct {
 }
 
 type loginReq struct {
-	Email    string `json:"email" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Email    string `json:"email" binding:"required" example:"admin@demo.kz"`
+	Password string `json:"password" binding:"required" example:"demo1234"`
 }
 
+// Login godoc
+// @Summary     Login
+// @Description Authenticate with email + password, returns a signed JWT.
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body loginReq true "Credentials"
+// @Success     200 {object} map[string]interface{}
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Router      /api/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -47,6 +58,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
+// Me godoc
+// @Summary     Current user
+// @Description Returns the authenticated user's ID, clinic, and role from the JWT.
+// @Tags        auth
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} map[string]interface{}
+// @Failure     401 {object} map[string]string
+// @Router      /api/auth/me [get]
 func (h *AuthHandler) Me(c *gin.Context) {
 	claims := middleware.ClaimsFrom(c)
 	if claims == nil {

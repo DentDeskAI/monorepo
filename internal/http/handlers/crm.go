@@ -29,8 +29,16 @@ type CRMHandler struct {
 	WhatsApp      *whatsapp.Client
 }
 
-// --- Chats ---
-
+// ListChats godoc
+// @Summary     List chats
+// @Description Returns the 100 most recent conversations for the clinic, enriched with patient info and last message.
+// @Tags        chats
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {array}  map[string]interface{}
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /api/chats [get]
 func (h *CRMHandler) ListChats(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	convs, err := h.Conversations.ListForClinic(c.Request.Context(), cl.ClinicID, 100)
@@ -38,7 +46,6 @@ func (h *CRMHandler) ListChats(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// Обогащаем пациентом + последним сообщением (N+1 вариант, норм для MVP).
 	type row struct {
 		Conversation conversations.Conversation `json:"conversation"`
 		Patient      *patients.Patient          `json:"patient"`
@@ -57,6 +64,18 @@ func (h *CRMHandler) ListChats(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
+// ListMessages godoc
+// @Summary     List messages
+// @Description Returns up to 200 messages for a conversation in chronological order.
+// @Tags        chats
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Conversation UUID"
+// @Success     200 {array}  object
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /api/chats/{id}/messages [get]
 func (h *CRMHandler) ListMessages(c *gin.Context) {
 	convID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -72,9 +91,24 @@ func (h *CRMHandler) ListMessages(c *gin.Context) {
 }
 
 type sendMsgReq struct {
-	Body string `json:"body" binding:"required"`
+	Body string `json:"body" binding:"required" example:"Завтра в 10:00 вам подходит?"`
 }
 
+// OperatorSend godoc
+// @Summary     Send operator message
+// @Description Sends a message from the operator to the patient via WhatsApp and sets conversation to handoff.
+// @Tags        chats
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path string     true "Conversation UUID"
+// @Param       body body sendMsgReq true "Message body"
+// @Success     200 {object} object
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /api/chats/{id}/send [post]
 func (h *CRMHandler) OperatorSend(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	convID, err := uuid.Parse(c.Param("id"))
@@ -87,7 +121,6 @@ func (h *CRMHandler) OperatorSend(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad body"})
 		return
 	}
-	// Берём conversation + patient, чтобы знать номер.
 	convs, _ := h.Conversations.ListForClinic(c.Request.Context(), cl.ClinicID, 500)
 	var conv *conversations.Conversation
 	for i := range convs {
@@ -118,7 +151,6 @@ func (h *CRMHandler) OperatorSend(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// Переводим диалог в handoff (бот замолкает).
 	_ = h.Conversations.SetStatus(c.Request.Context(), convID, "handoff")
 
 	go func() {
@@ -131,6 +163,17 @@ func (h *CRMHandler) OperatorSend(c *gin.Context) {
 	c.JSON(http.StatusOK, msg)
 }
 
+// ReleaseHandoff godoc
+// @Summary     Release handoff
+// @Description Sets conversation status back to active so the bot resumes handling it.
+// @Tags        chats
+// @Security    BearerAuth
+// @Param       id path string true "Conversation UUID"
+// @Success     204
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /api/chats/{id}/release [post]
 func (h *CRMHandler) ReleaseHandoff(c *gin.Context) {
 	convID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -144,8 +187,16 @@ func (h *CRMHandler) ReleaseHandoff(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// --- Patients ---
-
+// ListPatients godoc
+// @Summary     List patients
+// @Description Returns up to 200 patients for the clinic.
+// @Tags        patients
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {array}  object
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /api/patients [get]
 func (h *CRMHandler) ListPatients(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	out, err := h.Patients.List(c.Request.Context(), cl.ClinicID, 200)
@@ -156,6 +207,18 @@ func (h *CRMHandler) ListPatients(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
+// PatientAppointments godoc
+// @Summary     Patient appointments
+// @Description Returns all appointments for a specific patient.
+// @Tags        patients
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Patient UUID"
+// @Success     200 {array}  object
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /api/patients/{id}/appointments [get]
 func (h *CRMHandler) PatientAppointments(c *gin.Context) {
 	pid, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -170,8 +233,18 @@ func (h *CRMHandler) PatientAppointments(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// --- Calendar ---
-
+// Calendar godoc
+// @Summary     Calendar
+// @Description Returns appointments in a date range (RFC3339). Defaults to last 24h + next 7 days.
+// @Tags        calendar
+// @Produce     json
+// @Security    BearerAuth
+// @Param       from query string false "Start time (RFC3339)" example:"2026-04-25T00:00:00Z"
+// @Param       to   query string false "End time (RFC3339)"   example:"2026-05-02T00:00:00Z"
+// @Success     200 {array}  object
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /api/calendar [get]
 func (h *CRMHandler) Calendar(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	fromStr := c.Query("from")
@@ -179,7 +252,6 @@ func (h *CRMHandler) Calendar(c *gin.Context) {
 	from, err1 := time.Parse(time.RFC3339, fromStr)
 	to, err2 := time.Parse(time.RFC3339, toStr)
 	if err1 != nil || err2 != nil {
-		// дефолт: ближайшие 7 дней
 		from = time.Now().Add(-24 * time.Hour)
 		to = time.Now().Add(7 * 24 * time.Hour)
 	}
@@ -191,8 +263,16 @@ func (h *CRMHandler) Calendar(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// --- Doctors ---
-
+// ListDoctors godoc
+// @Summary     List doctors
+// @Description Returns all active doctors for the clinic.
+// @Tags        doctors
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {array}  object
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /api/doctors [get]
 func (h *CRMHandler) ListDoctors(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	out, err := h.Doctors.List(c.Request.Context(), cl.ClinicID)
@@ -203,14 +283,17 @@ func (h *CRMHandler) ListDoctors(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// --- SSE ---
-
+// SSE godoc
+// @Summary     Real-time event stream
+// @Description Server-Sent Events stream for live updates (new messages, appointments). Pass JWT via ?token= query param.
+// @Tags        realtime
+// @Produce     text/event-stream
+// @Security    BearerAuth
+// @Param       token query string true "JWT token"
+// @Success     200 {string} string "SSE stream"
+// @Failure     401 {object} map[string]string
+// @Router      /api/events [get]
 func (h *CRMHandler) SSE(c *gin.Context) {
-	// Gin SSE не поддерживает "текущий EventSource" из браузера с JWT в хедере,
-	// поэтому токен приходит в query ?token=...
-	tokenStr := c.Query("token")
-	_ = tokenStr // Токен валидируется в wrapper-мидлваре
-
 	cl := middleware.ClaimsFrom(c)
 	ch, unsub := h.Hub.Subscribe(cl.ClinicID)
 	defer unsub()
@@ -219,7 +302,6 @@ func (h *CRMHandler) SSE(c *gin.Context) {
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
-
 	c.Writer.Flush()
 
 	ctx := c.Request.Context()
@@ -246,15 +328,22 @@ func (h *CRMHandler) SSE(c *gin.Context) {
 	}
 }
 
-// --- Stats (tiny dashboard widget) ---
-
+// Stats godoc
+// @Summary     Dashboard stats
+// @Description Returns active chat count, today's appointment count, and total patients.
+// @Tags        dashboard
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} map[string]int
+// @Failure     401 {object} map[string]string
+// @Router      /api/stats [get]
 func (h *CRMHandler) Stats(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	ctx := c.Request.Context()
 	type stats struct {
-		ActiveChats    int `json:"active_chats"`
-		TodayAppts     int `json:"today_appts"`
-		TotalPatients  int `json:"total_patients"`
+		ActiveChats   int `json:"active_chats"`
+		TodayAppts    int `json:"today_appts"`
+		TotalPatients int `json:"total_patients"`
 	}
 	var s stats
 	db := h.DB

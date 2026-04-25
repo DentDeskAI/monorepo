@@ -123,6 +123,17 @@ func (r *Repo) ListMessages(ctx context.Context, conversationID uuid.UUID, limit
 }
 
 // RecentHistory возвращает последние N сообщений в хронологическом порядке (для LLM контекста).
+func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Conversation, error) {
+	var c Conversation
+	err := r.db.GetContext(ctx, &c,
+		`SELECT id, clinic_id, patient_id, status, context, last_message_at, created_at
+		 FROM conversations WHERE id=$1`, id)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 func (r *Repo) RecentHistory(ctx context.Context, conversationID uuid.UUID, limit int) ([]Message, error) {
 	msgs, err := r.ListMessages(ctx, conversationID, limit)
 	if err != nil {

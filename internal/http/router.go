@@ -6,6 +6,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/dentdesk/dentdesk/internal/auth"
 	"github.com/dentdesk/dentdesk/internal/http/handlers"
@@ -13,12 +15,15 @@ import (
 )
 
 type Router struct {
-	AuthSvc  *auth.Service
-	Log      zerolog.Logger
-	Origin   string
-	AuthH    *handlers.AuthHandler
-	CRMH     *handlers.CRMHandler
-	WhatsApp *handlers.WhatsAppHandler
+	AuthSvc    *auth.Service
+	Log        zerolog.Logger
+	Origin     string
+	AuthH      *handlers.AuthHandler
+	AdminH     *handlers.AdminHandler
+	CRMH       *handlers.CRMHandler
+	ResourceH  *handlers.ResourceHandler
+	ScheduleH  *handlers.SchedulingHandler
+	WhatsApp   *handlers.WhatsAppHandler
 }
 
 func (r *Router) Build() *gin.Engine {
@@ -35,14 +40,12 @@ func (r *Router) Build() *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	app.GET("/healthz", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
+	app.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+	app.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// ==== Public ====
+	app.POST("/api/register", r.AdminH.Register)
 	app.POST("/api/auth/login", r.AuthH.Login)
-
-	// WhatsApp webhook (без JWT, защищает verify_token + идемпотентность)
 	app.GET("/webhook/whatsapp", r.WhatsApp.Verify)
 	app.POST("/webhook/whatsapp", r.WhatsApp.Receive)
 
@@ -50,20 +53,60 @@ func (r *Router) Build() *gin.Engine {
 	authmw := middleware.AuthRequired(r.AuthSvc)
 	api := app.Group("/api", authmw)
 	{
+		// Auth
 		api.GET("/auth/me", r.AuthH.Me)
+		api.POST("/auth/change-password", r.AdminH.ChangePassword)
+
+		// Clinic
+		api.GET("/clinic", r.AdminH.GetClinic)
+		api.PUT("/clinic", r.AdminH.UpdateClinic)
+
+		// Users
+		api.GET("/users", r.AdminH.ListUsers)
+		api.POST("/users", r.AdminH.CreateUser)
+		api.GET("/users/:id", r.AdminH.GetUser)
+		api.PUT("/users/:id", r.AdminH.UpdateUser)
+		api.DELETE("/users/:id", r.AdminH.DeleteUser)
+
+		// Dashboard
 		api.GET("/stats", r.CRMH.Stats)
 
+		// Chats
 		api.GET("/chats", r.CRMH.ListChats)
+		api.GET("/chats/:id", r.ScheduleH.GetConversation)
 		api.GET("/chats/:id/messages", r.CRMH.ListMessages)
 		api.POST("/chats/:id/send", r.CRMH.OperatorSend)
 		api.POST("/chats/:id/release", r.CRMH.ReleaseHandoff)
+		api.POST("/chats/:id/close", r.ScheduleH.CloseConversation)
 
+		// Patients
 		api.GET("/patients", r.CRMH.ListPatients)
+		api.POST("/patients", r.ResourceH.CreatePatient)
+		api.GET("/patients/:id", r.ResourceH.GetPatient)
+		api.PUT("/patients/:id", r.ResourceH.UpdatePatient)
 		api.GET("/patients/:id/appointments", r.CRMH.PatientAppointments)
 
-		api.GET("/calendar", r.CRMH.Calendar)
+		// Doctors
 		api.GET("/doctors", r.CRMH.ListDoctors)
+		api.POST("/doctors", r.ResourceH.CreateDoctor)
+		api.GET("/doctors/:id", r.ResourceH.GetDoctor)
+		api.PUT("/doctors/:id", r.ResourceH.UpdateDoctor)
+		api.DELETE("/doctors/:id", r.ResourceH.DeactivateDoctor)
 
+		// Chairs
+		api.GET("/chairs", r.ResourceH.ListChairs)
+		api.POST("/chairs", r.ResourceH.CreateChair)
+		api.PUT("/chairs/:id", r.ResourceH.UpdateChair)
+		api.DELETE("/chairs/:id", r.ResourceH.DeactivateChair)
+
+		// Scheduling
+		api.GET("/slots", r.ScheduleH.GetSlots)
+		api.POST("/appointments", r.ScheduleH.CreateAppointment)
+		api.GET("/appointments/:id", r.ScheduleH.GetAppointment)
+		api.PUT("/appointments/:id/status", r.ScheduleH.UpdateAppointmentStatus)
+		api.GET("/calendar", r.CRMH.Calendar)
+
+		// Realtime
 		api.GET("/events", r.CRMH.SSE)
 	}
 

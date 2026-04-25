@@ -46,3 +46,25 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Doctor, error) {
 	}
 	return &d, nil
 }
+
+func (r *Repo) Create(ctx context.Context, clinicID uuid.UUID, name string, specialty *string, externalID *string) (*Doctor, error) {
+	var d Doctor
+	err := r.db.GetContext(ctx, &d,
+		`INSERT INTO doctors (clinic_id, name, specialty, external_id)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, clinic_id, external_id, name, specialty, active`,
+		clinicID, name, specialty, externalID)
+	return &d, err
+}
+
+func (r *Repo) Update(ctx context.Context, id uuid.UUID, name string, specialty *string, active bool) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE doctors SET name=$1, specialty=$2, active=$3 WHERE id=$4`,
+		name, specialty, active, id)
+	return err
+}
+
+func (r *Repo) Deactivate(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE doctors SET active=FALSE WHERE id=$1`, id)
+	return err
+}

@@ -1,8 +1,21 @@
+// @title           DentDesk API
+// @version         1.0
+// @description     Dental CRM — WhatsApp bot + operator workspace.
+// @host            localhost:8082
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+// @description     Format: "Bearer <token>"
+
 package main
 
 import (
+	_ "github.com/dentdesk/dentdesk/docs"
+
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,6 +24,8 @@ import (
 
 	"github.com/dentdesk/dentdesk/internal/appointments"
 	"github.com/dentdesk/dentdesk/internal/auth"
+	"github.com/dentdesk/dentdesk/internal/chairs"
+	"github.com/dentdesk/dentdesk/internal/clinics"
 	"github.com/dentdesk/dentdesk/internal/conversations"
 	"github.com/dentdesk/dentdesk/internal/doctors"
 	httpx "github.com/dentdesk/dentdesk/internal/http"
@@ -57,20 +72,22 @@ func main() {
 	defer redisClient.Close()
 
 	// --- Repositories ---
+	clinicsRepo := clinics.NewRepo(database)
+	chairsRepo := chairs.NewRepo(database)
 	patientsRepo := patients.NewRepo(database)
 	convRepo := conversations.NewRepo(database)
 	apptRepo := appointments.NewRepo(database)
 	doctorsRepo := doctors.NewRepo(database)
 
-	// --- Scheduler: выбираем реализацию на старте (для MVP — по env).
+	// --- Scheduler ---
 	var sched scheduler.Scheduler
 	switch cfg.SchedulerDefault {
 	case "mock":
 		sched = scheduler.NewMockAdapter(database)
 		log.Info().Msg("scheduler: mock")
 	case "macdent":
-		sched = scheduler.NewMacDentAdapter("", "") // placeholder; в проде — per-clinic
-		log.Info().Msg("scheduler: macdent")
+		sched = scheduler.NewMacDentAdapter("", cfg.MacDentAPIKey)
+		log.Info().Str("key_set", fmt.Sprint(cfg.MacDentAPIKey != "")).Msg("scheduler: macdent")
 	default:
 		sched = scheduler.NewLocalAdapter(database)
 		log.Info().Msg("scheduler: local")
@@ -113,6 +130,7 @@ func main() {
 
 	// --- Handlers ---
 	authH := &handlers.AuthHandler{Svc: authSvc}
+	adminH := &handlers.AdminHandler{Auth: authSvc, Clinics: clinicsRepo}
 	crmH := &handlers.CRMHandler{
 		DB:            database,
 		Patients:      patientsRepo,
@@ -121,6 +139,16 @@ func main() {
 		Doctors:       doctorsRepo,
 		Hub:           hub,
 		WhatsApp:      waClient,
+	}
+	resourceH := &handlers.ResourceHandler{
+		Doctors:  doctorsRepo,
+		Chairs:   chairsRepo,
+		Patients: patientsRepo,
+	}
+	scheduleH := &handlers.SchedulingHandler{
+		Appointments:  apptRepo,
+		Conversations: convRepo,
+		Scheduler:     sched,
 	}
 	waH := &handlers.WhatsAppHandler{
 		DB:            database,
@@ -136,12 +164,15 @@ func main() {
 	}
 
 	router := (&httpx.Router{
-		AuthSvc:  authSvc,
-		Log:      log,
-		Origin:   cfg.CRMOrigin,
-		AuthH:    authH,
-		CRMH:     crmH,
-		WhatsApp: waH,
+		AuthSvc:   authSvc,
+		Log:       log,
+		Origin:    cfg.CRMOrigin,
+		AuthH:     authH,
+		AdminH:    adminH,
+		CRMH:      crmH,
+		ResourceH: resourceH,
+		ScheduleH: scheduleH,
+		WhatsApp:  waH,
 	}).Build()
 
 	srv := &http.Server{
@@ -157,7 +188,6 @@ func main() {
 		}
 	}()
 
-	// --- Graceful shutdown ---
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop

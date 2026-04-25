@@ -157,3 +157,16 @@ func (r *Repo) SetStatus(ctx context.Context, id uuid.UUID, status string) error
 		`UPDATE appointments SET status=$1 WHERE id=$2`, status, id)
 	return err
 }
+
+func (r *Repo) Create(ctx context.Context, a *Appointment) (*Appointment, error) {
+	var out Appointment
+	err := r.db.GetContext(ctx, &out,
+		`INSERT INTO appointments
+		   (clinic_id, patient_id, doctor_id, chair_id, starts_at, ends_at, service, status, source)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		 RETURNING id, clinic_id, patient_id, doctor_id, chair_id, external_id,
+		           starts_at, ends_at, service, status, source, created_at`,
+		a.ClinicID, a.PatientID, a.DoctorID, a.ChairID,
+		a.StartsAt, a.EndsAt, a.Service, a.Status, a.Source)
+	return &out, err
+}

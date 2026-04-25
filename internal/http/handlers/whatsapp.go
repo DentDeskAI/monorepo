@@ -32,7 +32,16 @@ type WhatsAppHandler struct {
 	Hub           *realtime.Hub
 }
 
-// Verify — GET /webhook/whatsapp (Meta periodic verification).
+// Verify godoc
+// @Summary     WhatsApp webhook verification
+// @Description Meta calls this to verify the webhook endpoint. Returns hub.challenge on success.
+// @Tags        webhook
+// @Param       hub.mode         query string true  "Must be 'subscribe'"
+// @Param       hub.verify_token query string true  "Secret token configured in Meta dashboard"
+// @Param       hub.challenge    query string true  "Challenge string to echo back"
+// @Success     200 {string} string "challenge"
+// @Failure     403
+// @Router      /webhook/whatsapp [get]
 func (h *WhatsAppHandler) Verify(c *gin.Context) {
 	mode := c.Query("hub.mode")
 	token := c.Query("hub.verify_token")
@@ -44,7 +53,13 @@ func (h *WhatsAppHandler) Verify(c *gin.Context) {
 	c.Status(http.StatusForbidden)
 }
 
-// Receive — POST /webhook/whatsapp.
+// Receive godoc
+// @Summary     WhatsApp incoming message
+// @Description Receives incoming messages from Meta and triggers bot orchestration asynchronously.
+// @Tags        webhook
+// @Accept      json
+// @Success     200
+// @Router      /webhook/whatsapp [post]
 func (h *WhatsAppHandler) Receive(c *gin.Context) {
 	var payload whatsapp.WebhookPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {

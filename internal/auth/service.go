@@ -97,3 +97,63 @@ func HashPassword(pw string) (string, error) {
 	h, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 	return string(h), err
 }
+
+func (s *Service) ListUsers(ctx context.Context, clinicID uuid.UUID) ([]User, error) {
+	var out []User
+	err := s.db.SelectContext(ctx, &out,
+		`SELECT id, clinic_id, email, password_hash, role, name
+		 FROM users WHERE clinic_id=$1 ORDER BY name`, clinicID)
+	return out, err
+}
+
+func (s *Service) GetUser(ctx context.Context, id uuid.UUID) (*User, error) {
+	var u User
+	err := s.db.GetContext(ctx, &u,
+		`SELECT id, clinic_id, email, password_hash, role, name FROM users WHERE id=$1`, id)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (s *Service) CreateUser(ctx context.Context, clinicID uuid.UUID, email, password, role, name string) (*User, error) {
+	hash, err := HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+	var u User
+	err = s.db.GetContext(ctx, &u,
+		`INSERT INTO users (clinic_id, email, password_hash, role, name)
+		 VALUES ($1,$2,$3,$4,$5)
+		 RETURNING id, clinic_id, email, password_hash, role, name`,
+		clinicID, email, hash, role, name)
+	return &u, err
+}
+
+func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, name, role string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET name=$1, role=$2 WHERE id=$3`, name, role, id)
+	return err
+}
+
+func (s *Service) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, id)
+	return err
+}
+
+func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, oldPw, newPw string) error {
+	var u User
+	if err := s.db.GetContext(ctx, &u,
+		`SELECT id, clinic_id, email, password_hash, role, name FROM users WHERE id=$1`, userID); err != nil {
+		return errs.ErrUnauthorized
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(oldPw)); err != nil {
+		return errs.ErrUnauthorized
+	}
+	hash, err := HashPassword(newPw)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE users SET password_hash=$1 WHERE id=$2`, hash, userID)
+	return err
+}
