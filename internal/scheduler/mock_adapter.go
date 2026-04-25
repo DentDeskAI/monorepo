@@ -21,6 +21,25 @@ func NewMockAdapter(db *sqlx.DB) *MockAdapter {
 	return &MockAdapter{db: db, held: map[string]bool{}}
 }
 
+func (a *MockAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
+	type row struct {
+		ID        uuid.UUID `db:"id"`
+		Name      string    `db:"name"`
+		Specialty string    `db:"specialty"`
+	}
+	var rows []row
+	if err := a.db.SelectContext(ctx, &rows,
+		`SELECT id, name, specialty FROM doctors WHERE clinic_id=$1 AND active=TRUE ORDER BY name LIMIT 3`,
+		clinicID); err != nil {
+		return nil, err
+	}
+	out := make([]Doctor, len(rows))
+	for i, r := range rows {
+		out[i] = Doctor{ID: r.ID.String(), Name: r.Name, Specialty: r.Specialty}
+	}
+	return out, nil
+}
+
 func (a *MockAdapter) GetFreeSlots(ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string) ([]Slot, error) {
 	type doc struct {
 		ID   uuid.UUID `db:"id"`

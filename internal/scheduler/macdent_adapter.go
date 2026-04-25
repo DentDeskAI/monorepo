@@ -7,10 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
 
 const (
@@ -19,28 +19,38 @@ const (
 )
 
 // MacDentAdapter integrates with the real MacDent scheduling API.
-// All requests use POST with form-encoded body; access_token is a required field.
+// All requests use GET with access_token as a query parameter.
 type MacDentAdapter struct {
-	apiKey string
-	http   *http.Client
+	db   *sqlx.DB
+	http *http.Client
 }
 
-func NewMacDentAdapter(_, apiKey string) *MacDentAdapter {
+func NewMacDentAdapter(db *sqlx.DB) *MacDentAdapter {
 	return &MacDentAdapter{
-		apiKey: apiKey,
-		http:   &http.Client{Timeout: 15 * time.Second},
+		db: db,
+		http: &http.Client{
+			Timeout: 15 * time.Second,
+		},
 	}
 }
 
-// post sends a form-encoded POST, returns raw response bytes (on response=1) or an error.
-func (a *MacDentAdapter) post(ctx context.Context, path string, fields url.Values) ([]byte, error) {
-	fields.Set("access_token", a.apiKey)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		macdentBase+path, strings.NewReader(fields.Encode()))
+func (a *MacDentAdapter) GetClinicAPI(ctx context.Context, clinicID uuid.UUID) (string, error) {
+	var api string
+	err := a.db.GetContext(ctx, &api, `SELECT macdent_api_key FROM clinics WHERE id = $1`, clinicID)
+	return api, err
+}
+
+// get sends a GET request with access_token and any extra params as query string.
+func (a *MacDentAdapter) get(ctx context.Context, apiKey, path string, params url.Values) ([]byte, error) {
+	if params == nil {
+		params = url.Values{}
+	}
+	params.Set("access_token", apiKey)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		macdentBase+path+"?"+params.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := a.http.Do(req)
 	if err != nil {
@@ -71,38 +81,51 @@ type mdSpecialty struct {
 }
 
 type mdDoctor struct {
-	ID          int           `json:"id"`
-	Name        string        `json:"name"`
+	ID           int           `json:"id"`
+	Name         string        `json:"name"`
 	Specialnosti []mdSpecialty `json:"specialnosti"`
 }
 
-func (a *MacDentAdapter) listDoctors(ctx context.Context, specialty string) ([]mdDoctor, error) {
-	b, err := a.post(ctx, "/doctor/find", url.Values{})
+type doctorsResponse struct {
+	Doctors []mdDoctor `json:"doctors"`
+}
+
+func (a *MacDentAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
+	apiKey, err := a.GetClinicAPI(ctx, clinicID)
+	if err != nil {
+		return nil, fmt.Errorf("macdent: get api key: %w", err)
+	}
+	mds, err := a.listDoctors(ctx, apiKey)
 	if err != nil {
 		return nil, err
 	}
-	var resp struct {
-		Doctors []mdDoctor `json:"doctors"`
+	out := make([]Doctor, 0, len(mds))
+	for _, d := range mds {
+		spec := ""
+		if len(d.Specialnosti) > 0 {
+			spec = d.Specialnosti[0].Name
+		}
+		out = append(out, Doctor{
+			ID:        fmt.Sprint(d.ID),
+			Name:      d.Name,
+			Specialty: spec,
+		})
 	}
+	return out, nil
+}
+
+func (a *MacDentAdapter) listDoctors(ctx context.Context, apiKey string) ([]mdDoctor, error) {
+	b, err := a.get(ctx, apiKey, "/doctor/find", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp doctorsResponse
 	if err := json.Unmarshal(b, &resp); err != nil {
 		return nil, fmt.Errorf("macdent doctor/find: %w", err)
 	}
 
-	if specialty == "" {
-		return resp.Doctors, nil
-	}
-	// filter by specialty name (case-insensitive substring match)
-	specialtyLower := strings.ToLower(specialty)
-	var filtered []mdDoctor
-	for _, d := range resp.Doctors {
-		for _, s := range d.Specialnosti {
-			if strings.Contains(strings.ToLower(s.Name), specialtyLower) {
-				filtered = append(filtered, d)
-				break
-			}
-		}
-	}
-	return filtered, nil
+	return resp.Doctors, nil
 }
 
 // ── free slots ────────────────────────────────────────────────────────────────
@@ -117,9 +140,14 @@ func parseMDTime(s string) (time.Time, error) {
 }
 
 func (a *MacDentAdapter) GetFreeSlots(
-	ctx context.Context, _ uuid.UUID, from, to time.Time, specialty string,
+	ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string,
 ) ([]Slot, error) {
-	doctors, err := a.listDoctors(ctx, specialty)
+	apiKey, err := a.GetClinicAPI(ctx, clinicID)
+	if err != nil {
+		return nil, fmt.Errorf("macdent: get api key: %w", err)
+	}
+
+	doctors, err := a.listDoctors(ctx, apiKey)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +159,7 @@ func (a *MacDentAdapter) GetFreeSlots(
 			"dateFrom": {from.Format("2006-01-02")},
 			"dateTo":   {to.Format("2006-01-02")},
 		}
-		b, err := a.post(ctx, "/doctor/get_free_time", fields)
+		b, err := a.get(ctx, apiKey, "/doctor/get_free_time", fields)
 		if err != nil {
 			continue
 		}
@@ -165,17 +193,20 @@ func (a *MacDentAdapter) GetFreeSlots(
 // ── create appointment (zapis/add) ────────────────────────────────────────────
 
 func (a *MacDentAdapter) CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error) {
-	// MacDent requires an integer doctor ID. We store it in the doctor's external_id.
-	// The caller passes it via BookRequest.Service as a fallback for now if DoctorID is nil,
-	// but typically the external_id must be resolved upstream.
+	apiKey, err := a.GetClinicAPI(ctx, req.ClinicID)
+	if err != nil {
+		return nil, fmt.Errorf("macdent: get api key: %w", err)
+	}
+
+	// MacDent requires an integer doctor ID stored in doctors.external_id.
 	fields := url.Values{
 		"start":   {req.StartsAt.Format(macdentDateLayout)},
 		"end":     {req.EndsAt.Format(macdentDateLayout)},
-		"doctor":  {req.DoctorID.String()}, // should be MacDent int id stored as external_id
+		"doctor":  {req.DoctorID.String()},
 		"zhaloba": {req.Service},
 	}
 
-	b, err := a.post(ctx, "/zapis/add", fields)
+	b, err := a.get(ctx, apiKey, "/zapis/add", fields)
 	if err != nil {
 		return nil, err
 	}

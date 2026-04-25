@@ -50,7 +50,8 @@ export const api = {
     request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
 
   // doctors
-  doctors: () => request("/doctors"),
+  doctors: () => request("/schedule/doctors"),
+  // doctors: () => request("/doctors"), for local DB
   doctor: (id) => request(`/doctors/${id}`),
 
   // stats

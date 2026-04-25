@@ -52,9 +52,9 @@ func Load() *Config {
 		GroqAPIKey:      env("GROQ_API_KEY", ""),
 		GroqModel:       env("GROQ_MODEL", "llama-3.3-70b-versatile"),
 
-		SchedulerDefault:  env("SCHEDULER_DEFAULT", "local"),
-		MacDentAPIKey:     env("MACDENT_API_KEY", ""),
-		CRMOrigin:         env("CRM_ORIGIN", "http://localhost:5173"),
+		SchedulerDefault: env("SCHEDULER_DEFAULT", "macdent"),
+		MacDentAPIKey:    env("MACDENT_API_KEY", ""),
+		CRMOrigin:        env("CRM_ORIGIN", "http://localhost:5173"),
 	}
 }
 
