@@ -26,6 +26,25 @@ type busyRow struct {
 	EndsAt   time.Time `db:"ends_at"`
 }
 
+func (a *LocalAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
+	type row struct {
+		ID        uuid.UUID `db:"id"`
+		Name      string    `db:"name"`
+		Specialty string    `db:"specialty"`
+	}
+	var rows []row
+	if err := a.db.SelectContext(ctx, &rows,
+		`SELECT id, name, specialty FROM doctors WHERE clinic_id=$1 AND active=TRUE ORDER BY name`,
+		clinicID); err != nil {
+		return nil, err
+	}
+	out := make([]Doctor, len(rows))
+	for i, r := range rows {
+		out[i] = Doctor{ID: r.ID.String(), Name: r.Name, Specialty: r.Specialty}
+	}
+	return out, nil
+}
+
 func (a *LocalAdapter) GetFreeSlots(ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string) ([]Slot, error) {
 	type doc struct {
 		ID   uuid.UUID `db:"id"`

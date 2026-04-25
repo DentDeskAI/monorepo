@@ -100,6 +100,7 @@ func (r *Router) Build() *gin.Engine {
 		api.DELETE("/chairs/:id", r.ResourceH.DeactivateChair)
 
 		// Scheduling
+		api.GET("/schedule/doctors", r.ScheduleH.GetDoctors)
 		api.GET("/slots", r.ScheduleH.GetSlots)
 		api.POST("/appointments", r.ScheduleH.CreateAppointment)
 		api.GET("/appointments/:id", r.ScheduleH.GetAppointment)
