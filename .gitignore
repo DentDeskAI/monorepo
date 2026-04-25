@@ -16,3 +16,5 @@ web/dist/
 # Docker volumes / OS
 .DS_Store
 .claude/
+
+s.sh

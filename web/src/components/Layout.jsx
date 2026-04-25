@@ -6,6 +6,7 @@ const items = [
   { to: "/chats",     label: "Чаты",      icon: "💬" },
   { to: "/calendar",  label: "Календарь", icon: "📅" },
   { to: "/patients",  label: "Пациенты",  icon: "👤" },
+  { to: "/doctors",  label: "Докторы",  icon: "👨‍⚕️" },
 ];
 
 export default function Layout() {

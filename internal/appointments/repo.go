@@ -44,6 +44,10 @@ func (r *Repo) ListForPeriod(ctx context.Context, clinicID uuid.UUID, from, to t
 		 LEFT JOIN doctors  d ON d.id = a.doctor_id
 		 WHERE a.clinic_id=$1 AND a.starts_at >= $2 AND a.starts_at < $3
 		 ORDER BY a.starts_at`, clinicID, from, to)
+
+	if out == nil {
+		out = make([]Appointment, 0)
+	}
 	return out, err
 }
 

@@ -6,6 +6,7 @@ import Chats from "./pages/Chats";
 import Calendar from "./pages/Calendar";
 import Patients from "./pages/Patients";
 import { getUser } from "./api/client";
+import Doctors from "./pages/Doctors.jsx";
 
 function Protected({ children }) {
   const user = getUser();
@@ -25,11 +26,12 @@ export default function App() {
           </Protected>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="chats" element={<Chats />} />
-        <Route path="chats/:id" element={<Chats />} />
-        <Route path="calendar" element={<Calendar />} />
-        <Route path="patients" element={<Patients />} />
+          <Route index element={<Dashboard />} />
+          <Route path="chats" element={<Chats />} />
+          <Route path="chats/:id" element={<Chats />} />
+          <Route path="calendar" element={<Calendar />} />
+          <Route path="patients" element={<Patients />} />
+          <Route path="doctors" element={<Doctors />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

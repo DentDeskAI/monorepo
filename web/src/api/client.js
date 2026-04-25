@@ -44,9 +44,14 @@ export const api = {
   // patients / calendar / doctors
   patients: () => request("/patients"),
   patientAppts: (id) => request(`/patients/${id}/appointments`),
+
+  // calendar
   calendar: (from, to) =>
     request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+
+  // doctors
   doctors: () => request("/doctors"),
+  doctor: (id) => request(`/doctors/${id}`),
 
   // stats
   stats: () => request("/stats"),

@@ -42,11 +42,15 @@ func (r *Repo) GetOrCreateByPhone(ctx context.Context, clinicID uuid.UUID, phone
 }
 
 func (r *Repo) List(ctx context.Context, clinicID uuid.UUID, limit int) ([]Patient, error) {
-	var out []Patient
+	out := make([]Patient, 0)
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT id, clinic_id, phone, name, external_id, language
 		 FROM patients WHERE clinic_id=$1 ORDER BY created_at DESC LIMIT $2`,
 		clinicID, limit)
+
+	if out == nil {
+		out = make([]Patient, 0)
+	}
 	return out, err
 }
 
