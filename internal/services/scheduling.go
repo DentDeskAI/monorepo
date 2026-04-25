@@ -27,6 +27,10 @@ func NewSchedulingService(apptRepo *appointments.Repo, convRepo *conversations.R
 	return &SchedulingService{Appointments: apptRepo, Conversations: convRepo, Scheduler: sched}
 }
 
+func (s *SchedulingService) GetDoctors(ctx context.Context, clinicID uuid.UUID) ([]scheduler.Doctor, error) {
+	return s.Scheduler.ListDoctors(ctx, clinicID)
+}
+
 func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, from, to *time.Time, specialty string) ([]scheduler.Slot, error) {
 	start := time.Now()
 	end := time.Now().Add(7 * 24 * time.Hour)

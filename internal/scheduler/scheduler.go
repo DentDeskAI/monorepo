@@ -17,6 +17,12 @@ type Slot struct {
 	ChairID  *uuid.UUID `json:"chair_id,omitempty"`
 }
 
+type Doctor struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Specialty string `json:"specialty,omitempty"`
+}
+
 type BookRequest struct {
 	ClinicID  uuid.UUID
 	PatientID uuid.UUID
@@ -35,6 +41,7 @@ type BookResult struct {
 // Scheduler — то, что умеет наш поставщик расписания.
 // LocalAdapter хранит в нашей PG. MacDentAdapter ходит в чужой API.
 type Scheduler interface {
+	ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error)
 	GetFreeSlots(ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string) ([]Slot, error)
 	CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error)
 	CancelAppointment(ctx context.Context, appointmentID uuid.UUID) error

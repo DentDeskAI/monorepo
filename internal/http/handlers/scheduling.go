@@ -16,6 +16,16 @@ type SchedulingHandler struct {
 	Svc *services.SchedulingService
 }
 
+func (h *SchedulingHandler) GetDoctors(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	docs, err := h.Svc.GetDoctors(c.Request.Context(), cl.ClinicID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, docs)
+}
+
 func (h *SchedulingHandler) GetSlots(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	var from *time.Time

@@ -15,7 +15,6 @@ import (
 
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -87,8 +86,8 @@ func main() {
 		sched = scheduler.NewMockAdapter(database)
 		log.Info().Msg("scheduler: mock")
 	case "macdent":
-		sched = scheduler.NewMacDentAdapter("", cfg.MacDentAPIKey)
-		log.Info().Str("key_set", fmt.Sprint(cfg.MacDentAPIKey != "")).Msg("scheduler: macdent")
+		sched = scheduler.NewMacDentAdapter(database)
+		log.Info().Msg("scheduler: macdent")
 	default:
 		sched = scheduler.NewLocalAdapter(database)
 		log.Info().Msg("scheduler: local")
