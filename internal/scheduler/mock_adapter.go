@@ -23,9 +23,9 @@ func NewMockAdapter(db *sqlx.DB) *MockAdapter {
 
 func (a *MockAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
 	type row struct {
-		ID        uuid.UUID `db:"id"`
-		Name      string    `db:"name"`
-		Specialty string    `db:"specialty"`
+		ID          uuid.UUID `db:"id"`
+		Name        string    `db:"name"`
+		Specialties string    `db:"specialty"`
 	}
 	var rows []row
 	if err := a.db.SelectContext(ctx, &rows,
@@ -35,7 +35,7 @@ func (a *MockAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Do
 	}
 	out := make([]Doctor, len(rows))
 	for i, r := range rows {
-		out[i] = Doctor{ID: r.ID.String(), Name: r.Name, Specialty: r.Specialty}
+		out[i] = Doctor{ID: r.ID.String(), Name: r.Name, Specialties: []string{r.Specialties}}
 	}
 	return out, nil
 }

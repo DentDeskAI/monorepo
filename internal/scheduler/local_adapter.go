@@ -40,7 +40,7 @@ func (a *LocalAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]D
 	}
 	out := make([]Doctor, len(rows))
 	for i, r := range rows {
-		out[i] = Doctor{ID: r.ID.String(), Name: r.Name, Specialty: r.Specialty}
+		out[i] = Doctor{ID: r.ID.String(), Name: r.Name, Specialties: []string{r.Specialty}}
 	}
 	return out, nil
 }

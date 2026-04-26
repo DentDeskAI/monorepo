@@ -101,14 +101,14 @@ func (a *MacDentAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([
 	}
 	out := make([]Doctor, 0, len(mds))
 	for _, d := range mds {
-		spec := ""
-		if len(d.Specialnosti) > 0 {
-			spec = d.Specialnosti[0].Name
+		spec := make([]string, 0, len(d.Specialnosti))
+		for _, s := range d.Specialnosti {
+			spec = append(spec, s.Name)
 		}
 		out = append(out, Doctor{
-			ID:        fmt.Sprint(d.ID),
-			Name:      d.Name,
-			Specialty: spec,
+			ID:          fmt.Sprint(d.ID),
+			Name:        d.Name,
+			Specialties: spec,
 		})
 	}
 	return out, nil
