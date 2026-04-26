@@ -15,15 +15,15 @@ import (
 )
 
 type Router struct {
-	AuthSvc    *auth.Service
-	Log        zerolog.Logger
-	Origin     string
-	AuthH      *handlers.AuthHandler
-	AdminH     *handlers.AdminHandler
-	CRMH       *handlers.CRMHandler
-	ResourceH  *handlers.ResourceHandler
-	ScheduleH  *handlers.SchedulingHandler
-	WhatsApp   *handlers.WhatsAppHandler
+	AuthSvc   *auth.Service
+	Log       zerolog.Logger
+	Origin    string
+	AuthH     *handlers.AuthHandler
+	AdminH    *handlers.AdminHandler
+	CRMH      *handlers.CRMHandler
+	ResourceH *handlers.ResourceHandler
+	ScheduleH *handlers.SchedulingHandler
+	WhatsApp  *handlers.WhatsAppHandler
 }
 
 func (r *Router) Build() *gin.Engine {
@@ -80,9 +80,9 @@ func (r *Router) Build() *gin.Engine {
 		api.POST("/chats/:id/close", r.ScheduleH.CloseConversation)
 
 		// Patients
-		api.GET("/patients", r.CRMH.ListPatients)
+		api.GET("/patients", r.ScheduleH.GetPatients)
 		api.POST("/patients", r.ResourceH.CreatePatient)
-		api.GET("/patients/:id", r.ResourceH.GetPatient)
+		api.GET("/patients/:id", r.ScheduleH.GetPatient)
 		api.PUT("/patients/:id", r.ResourceH.UpdatePatient)
 		api.GET("/patients/:id/appointments", r.CRMH.PatientAppointments)
 
@@ -102,6 +102,8 @@ func (r *Router) Build() *gin.Engine {
 		// Scheduling
 		api.GET("/schedule/doctors", r.ScheduleH.GetDoctors)
 		api.POST("/schedule/doctors/sync", r.ScheduleH.SyncDoctors)
+		api.GET("/schedule/patients", r.ScheduleH.GetPatients)
+		api.GET("/schedule/patients/:id", r.ScheduleH.GetPatient)
 		api.GET("/slots", r.ScheduleH.GetSlots)
 		api.POST("/appointments", r.ScheduleH.CreateAppointment)
 		api.GET("/appointments/:id", r.ScheduleH.GetAppointment)

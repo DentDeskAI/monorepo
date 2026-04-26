@@ -3,9 +3,10 @@ package services
 import (
 	"context"
 	"errors"
-	"time"
-
+	"fmt"
 	"github.com/google/uuid"
+	"strconv"
+	"time"
 
 	"github.com/dentdesk/dentdesk/internal/appointments"
 	"github.com/dentdesk/dentdesk/internal/conversations"
@@ -35,6 +36,19 @@ func (s *SchedulingService) GetDoctors(ctx context.Context, clinicID uuid.UUID) 
 
 func (s *SchedulingService) GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*scheduler.Doctor, error) {
 	return s.Scheduler.GetDoctor(ctx, clinicID, id)
+}
+
+func (s *SchedulingService) GetPatients(ctx context.Context, clinicID uuid.UUID) ([]scheduler.Patient, error) {
+	return s.Scheduler.ListPatients(ctx, clinicID)
+}
+
+func (s *SchedulingService) GetPatient(ctx context.Context, clinicID uuid.UUID, id string) (*scheduler.Patient, error) {
+	patientID, err := strconv.Atoi(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid patient id %q: %w", id, err)
+	}
+
+	return s.Scheduler.GetPatient(ctx, clinicID, patientID)
 }
 
 func (s *SchedulingService) SyncDoctors(ctx context.Context, clinicID uuid.UUID) (int, error) {

@@ -17,6 +17,16 @@ type LocalAdapter struct {
 	closeHour       int
 }
 
+func (a *LocalAdapter) ListPatients(ctx context.Context, clinicID uuid.UUID) ([]Patient, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *LocalAdapter) GetPatient(ctx context.Context, clinicID uuid.UUID, id int) (*Patient, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewLocalAdapter(db *sqlx.DB) *LocalAdapter {
 	return &LocalAdapter{db: db, slotDurationMin: 30, openHour: 9, closeHour: 20}
 }
