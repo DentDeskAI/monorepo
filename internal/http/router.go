@@ -75,21 +75,22 @@ func (r *Router) Build() *gin.Engine {
 		api.POST("/chats/:id/release", r.CRMH.ReleaseHandoff)
 		api.POST("/chats/:id/close", r.ScheduleH.CloseConversation)
 
-		// Patients
+		// Patients (read = scheduler/MacDent, write = local repo)
 		api.GET("/patients", r.ScheduleH.GetPatients)
 		api.POST("/patients", r.ResourceH.CreatePatient)
 		api.GET("/patients/:id", r.ScheduleH.GetPatient)
 		api.PUT("/patients/:id", r.ResourceH.UpdatePatient)
 		api.GET("/patients/:id/appointments", r.CRMH.PatientAppointments)
 
-		// Doctors
+		// Doctors (read = scheduler/MacDent, write = local repo)
 		api.GET("/doctors", r.ScheduleH.GetDoctors)
 		api.POST("/doctors", r.ResourceH.CreateDoctor)
 		api.GET("/doctors/:id", r.ScheduleH.GetDoctor)
 		api.PUT("/doctors/:id", r.ResourceH.UpdateDoctor)
 		api.DELETE("/doctors/:id", r.ResourceH.DeactivateDoctor)
+		api.POST("/doctors/sync", r.ScheduleH.SyncDoctors)
 
-		// Clinic
+		// Clinic — local clinic record (settings, name set at registration)
 		api.GET("/clinic", r.AdminH.GetClinic)
 		api.PUT("/clinic", r.AdminH.UpdateClinic)
 
@@ -100,11 +101,6 @@ func (r *Router) Build() *gin.Engine {
 		api.DELETE("/chairs/:id", r.ResourceH.DeactivateChair)
 
 		// Scheduling
-		api.GET("/schedule/clinic", r.ScheduleH.GetClinic)
-		api.GET("/schedule/doctors", r.ScheduleH.GetDoctors)
-		api.POST("/schedule/doctors/sync", r.ScheduleH.SyncDoctors)
-		api.GET("/schedule/patients", r.ScheduleH.GetPatients)
-		api.GET("/schedule/patients/:id", r.ScheduleH.GetPatient)
 		api.GET("/slots", r.ScheduleH.GetSlots)
 		api.POST("/appointments", r.ScheduleH.CreateAppointment)
 		api.GET("/appointments/:id", r.ScheduleH.GetAppointment)

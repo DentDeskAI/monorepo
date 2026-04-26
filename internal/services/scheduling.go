@@ -3,10 +3,9 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
-	"github.com/google/uuid"
-	"strconv"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/dentdesk/dentdesk/internal/appointments"
 	"github.com/dentdesk/dentdesk/internal/conversations"
@@ -19,44 +18,36 @@ var (
 	ErrInvalidStatus = errors.New("invalid status")
 )
 
+// SchedulingService holds business logic that lives on top of the scheduling
+// layer: appointment validation, conversation lifecycle, etc. Pure passthrough
+// reads (list/get) are the responsibility of *scheduler.Service and are called
+// directly from handlers.
 type SchedulingService struct {
 	Appointments  *appointments.Repo
 	Conversations *conversations.Repo
-	Scheduler     scheduler.Scheduler
+	Sched         *scheduler.Service
 	Doctors       *doctors.Repo
 }
 
-func NewSchedulingService(apptRepo *appointments.Repo, convRepo *conversations.Repo, sched scheduler.Scheduler, doctorsRepo *doctors.Repo) *SchedulingService {
-	return &SchedulingService{Appointments: apptRepo, Conversations: convRepo, Scheduler: sched, Doctors: doctorsRepo}
-}
-
-func (s *SchedulingService) GetDoctors(ctx context.Context, clinicID uuid.UUID) ([]scheduler.Doctor, error) {
-	return s.Scheduler.ListDoctors(ctx, clinicID)
-}
-
-func (s *SchedulingService) GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*scheduler.Doctor, error) {
-	return s.Scheduler.GetDoctor(ctx, clinicID, id)
-}
-
-func (s *SchedulingService) GetPatients(ctx context.Context, clinicID uuid.UUID) ([]scheduler.Patient, error) {
-	return s.Scheduler.ListPatients(ctx, clinicID)
-}
-
-func (s *SchedulingService) GetPatient(ctx context.Context, clinicID uuid.UUID, id string) (*scheduler.Patient, error) {
-	patientID, err := strconv.Atoi(id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid patient id %q: %w", id, err)
+func NewSchedulingService(
+	apptRepo *appointments.Repo,
+	convRepo *conversations.Repo,
+	sched *scheduler.Service,
+	doctorsRepo *doctors.Repo,
+) *SchedulingService {
+	return &SchedulingService{
+		Appointments:  apptRepo,
+		Conversations: convRepo,
+		Sched:         sched,
+		Doctors:       doctorsRepo,
 	}
-
-	return s.Scheduler.GetPatient(ctx, clinicID, patientID)
 }
 
-func (s *SchedulingService) GetClinic(ctx context.Context, clinicID uuid.UUID) (*scheduler.Stomatology, error) {
-	return s.Scheduler.GetClinic(ctx, clinicID)
-}
-
+// SyncDoctors pulls the doctor list from MacDent and upserts each entry into
+// our local doctors table (keyed by external_id). This is the seed of what
+// will become a proper background sync worker.
 func (s *SchedulingService) SyncDoctors(ctx context.Context, clinicID uuid.UUID) (int, error) {
-	list, err := s.Scheduler.ListDoctors(ctx, clinicID)
+	list, err := s.Sched.ListDoctors(ctx, clinicID)
 	if err != nil {
 		return 0, err
 	}
@@ -72,6 +63,7 @@ func (s *SchedulingService) SyncDoctors(ctx context.Context, clinicID uuid.UUID)
 	return len(list), nil
 }
 
+// GetSlots normalises the time range and forwards to the scheduler.
 func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, from, to *time.Time, specialty string) ([]scheduler.Slot, error) {
 	start := time.Now()
 	end := time.Now().Add(7 * 24 * time.Hour)
@@ -79,7 +71,7 @@ func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, fr
 		start = *from
 		end = *to
 	}
-	slots, err := s.Scheduler.GetFreeSlots(ctx, clinicID, start, end, specialty)
+	slots, err := s.Sched.GetFreeSlots(ctx, clinicID, start, end, specialty)
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +81,9 @@ func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, fr
 	return slots, nil
 }
 
+// CreateAppointment validates the time range and persists the appointment in
+// our local DB (the canonical record). External-system push is a separate
+// concern handled by the integration layer.
 func (s *SchedulingService) CreateAppointment(ctx context.Context, clinicID uuid.UUID, patientID uuid.UUID, doctorID, chairID *uuid.UUID, startsAt, endsAt time.Time, service *string) (*appointments.Appointment, error) {
 	if !endsAt.After(startsAt) {
 		return nil, ErrInvalidRange
