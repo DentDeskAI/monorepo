@@ -16,6 +16,26 @@ type SchedulingHandler struct {
 	Svc *services.SchedulingService
 }
 
+func (h *SchedulingHandler) SyncDoctors(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	n, err := h.Svc.SyncDoctors(c.Request.Context(), cl.ClinicID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"synced": n})
+}
+
+func (h *SchedulingHandler) GetDoctor(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	d, err := h.Svc.GetDoctor(c.Request.Context(), cl.ClinicID, c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	c.JSON(http.StatusOK, d)
+}
+
 func (h *SchedulingHandler) GetDoctors(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	docs, err := h.Svc.GetDoctors(c.Request.Context(), cl.ClinicID)

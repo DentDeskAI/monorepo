@@ -9,6 +9,7 @@ import (
 
 	"github.com/dentdesk/dentdesk/internal/appointments"
 	"github.com/dentdesk/dentdesk/internal/conversations"
+	"github.com/dentdesk/dentdesk/internal/doctors"
 	"github.com/dentdesk/dentdesk/internal/scheduler"
 )
 
@@ -21,14 +22,36 @@ type SchedulingService struct {
 	Appointments  *appointments.Repo
 	Conversations *conversations.Repo
 	Scheduler     scheduler.Scheduler
+	Doctors       *doctors.Repo
 }
 
-func NewSchedulingService(apptRepo *appointments.Repo, convRepo *conversations.Repo, sched scheduler.Scheduler) *SchedulingService {
-	return &SchedulingService{Appointments: apptRepo, Conversations: convRepo, Scheduler: sched}
+func NewSchedulingService(apptRepo *appointments.Repo, convRepo *conversations.Repo, sched scheduler.Scheduler, doctorsRepo *doctors.Repo) *SchedulingService {
+	return &SchedulingService{Appointments: apptRepo, Conversations: convRepo, Scheduler: sched, Doctors: doctorsRepo}
 }
 
 func (s *SchedulingService) GetDoctors(ctx context.Context, clinicID uuid.UUID) ([]scheduler.Doctor, error) {
 	return s.Scheduler.ListDoctors(ctx, clinicID)
+}
+
+func (s *SchedulingService) GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*scheduler.Doctor, error) {
+	return s.Scheduler.GetDoctor(ctx, clinicID, id)
+}
+
+func (s *SchedulingService) SyncDoctors(ctx context.Context, clinicID uuid.UUID) (int, error) {
+	list, err := s.Scheduler.ListDoctors(ctx, clinicID)
+	if err != nil {
+		return 0, err
+	}
+	for _, d := range list {
+		var spec *string
+		if len(d.Specialties) > 0 {
+			spec = &d.Specialties[0]
+		}
+		if err := s.Doctors.Upsert(ctx, clinicID, d.Name, spec, d.ID); err != nil {
+			return 0, err
+		}
+	}
+	return len(list), nil
 }
 
 func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, from, to *time.Time, specialty string) ([]scheduler.Slot, error) {

@@ -110,12 +110,6 @@ export default function Doctors() {
                                     <h1 className="text-xl font-bold text-slate-900">
                                         {selected.name || "Имя не указано"}
                                     </h1>
-                                    <div className="text-sm text-slate-500">Специальность: {selected.specialty || "Терапевт"}</div>
-                                    <div className="mt-2">
-                                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${selected.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            {selected.active ? "● Активен" : "○ Неактивен"}
-                                        </span>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -131,12 +125,8 @@ export default function Doctors() {
                                 <div className="py-4 text-sm text-slate-500">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="p-3 bg-slate-50 rounded-lg">
-                                            <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Clinic ID</div>
-                                            <div className="truncate text-slate-700">{selected.clinic_id}</div>
-                                        </div>
-                                        <div className="p-3 bg-slate-50 rounded-lg">
-                                            <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Specialty Key</div>
-                                            <div className="text-slate-700">{selected.specialty}</div>
+                                            <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Специальносьти:</div>
+                                            <div className="text-slate-700">{(selected.specialties || []).join(", ") || "Не найдено" }</div>
                                         </div>
                                     </div>
                                 </div>

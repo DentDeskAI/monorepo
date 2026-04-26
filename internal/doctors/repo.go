@@ -37,6 +37,17 @@ func (r *Repo) FindBySpecialty(ctx context.Context, clinicID uuid.UUID, specialt
 	return out, err
 }
 
+func (r *Repo) GetByExternalID(ctx context.Context, clinicID uuid.UUID, externalID string) (*Doctor, error) {
+	var d Doctor
+	err := r.db.GetContext(ctx, &d,
+		`SELECT id, clinic_id, external_id, name, specialty, active
+		 FROM doctors WHERE clinic_id=$1 AND external_id=$2`, clinicID, externalID)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
 func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Doctor, error) {
 	var d Doctor
 	err := r.db.GetContext(ctx, &d,
@@ -45,6 +56,17 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Doctor, error) {
 		return nil, err
 	}
 	return &d, nil
+}
+
+// Upsert inserts a doctor identified by external_id, or updates name/specialty if it already exists.
+func (r *Repo) Upsert(ctx context.Context, clinicID uuid.UUID, name string, specialty *string, externalID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO doctors (clinic_id, name, specialty, external_id)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (clinic_id, external_id) DO UPDATE
+		   SET name=$2, specialty=$3`,
+		clinicID, name, specialty, externalID)
+	return err
 }
 
 func (r *Repo) Create(ctx context.Context, clinicID uuid.UUID, name string, specialty *string, externalID *string) (*Doctor, error) {

@@ -40,12 +40,19 @@ func (h *ResourceHandler) CreateDoctor(c *gin.Context) {
 }
 
 func (h *ResourceHandler) GetDoctor(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+	param := c.Param("id")
+	if id, err := uuid.Parse(param); err == nil {
+		d, err := h.Svc.GetDoctor(c.Request.Context(), id)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusOK, d)
 		return
 	}
-	d, err := h.Svc.GetDoctor(c.Request.Context(), id)
+	// param is a MacDent integer ID stored in external_id
+	cl := middleware.ClaimsFrom(c)
+	d, err := h.Svc.GetDoctorByExternalID(c.Request.Context(), cl.ClinicID, param)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return

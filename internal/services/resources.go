@@ -28,6 +28,10 @@ func (s *ResourceService) GetDoctor(ctx context.Context, id uuid.UUID) (*doctors
 	return s.Doctors.Get(ctx, id)
 }
 
+func (s *ResourceService) GetDoctorByExternalID(ctx context.Context, clinicID uuid.UUID, externalID string) (*doctors.Doctor, error) {
+	return s.Doctors.GetByExternalID(ctx, clinicID, externalID)
+}
+
 func (s *ResourceService) UpdateDoctor(ctx context.Context, id uuid.UUID, name string, specialty *string, active bool) error {
 	return s.Doctors.Update(ctx, id, name, specialty, active)
 }
