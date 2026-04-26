@@ -110,6 +110,20 @@ func (a *MacDentAdapter) GetPatient(ctx context.Context, clinicID uuid.UUID, id 
 	return nil, fmt.Errorf("doctor %d not found", id)
 }
 
+// ── clinic / stom ─────────────────────────────────────────────────────────────
+
+func (a *MacDentAdapter) GetClinic(ctx context.Context, clinicID uuid.UUID) (*Stomatology, error) {
+	client, err := a.clientFor(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	stom, err := client.GetClinic(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &Stomatology{ID: stom.ID, Name: stom.Name}, nil
+}
+
 // ── slots ─────────────────────────────────────────────────────────────────────
 
 func (a *MacDentAdapter) GetFreeSlots(

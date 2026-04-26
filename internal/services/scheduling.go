@@ -51,6 +51,10 @@ func (s *SchedulingService) GetPatient(ctx context.Context, clinicID uuid.UUID, 
 	return s.Scheduler.GetPatient(ctx, clinicID, patientID)
 }
 
+func (s *SchedulingService) GetClinic(ctx context.Context, clinicID uuid.UUID) (*scheduler.Stomatology, error) {
+	return s.Scheduler.GetClinic(ctx, clinicID)
+}
+
 func (s *SchedulingService) SyncDoctors(ctx context.Context, clinicID uuid.UUID) (int, error) {
 	list, err := s.Scheduler.ListDoctors(ctx, clinicID)
 	if err != nil {

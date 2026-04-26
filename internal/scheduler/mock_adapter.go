@@ -19,13 +19,22 @@ type MockAdapter struct {
 }
 
 func (a *MockAdapter) ListPatients(ctx context.Context, clinicID uuid.UUID) ([]Patient, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (a *MockAdapter) GetPatient(ctx context.Context, clinicID uuid.UUID, id int) (*Patient, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, fmt.Errorf("not supported in mock adapter")
+}
+
+func (a *MockAdapter) GetClinic(ctx context.Context, clinicID uuid.UUID) (*Stomatology, error) {
+	var row struct {
+		ID   string `db:"id"`
+		Name string `db:"name"`
+	}
+	if err := a.db.GetContext(ctx, &row, `SELECT id, name FROM clinics WHERE id=$1`, clinicID); err != nil {
+		return nil, err
+	}
+	return &Stomatology{ID: row.ID, Name: row.Name}, nil
 }
 
 func NewMockAdapter(db *sqlx.DB) *MockAdapter {
