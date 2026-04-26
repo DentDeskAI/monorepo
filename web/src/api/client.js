@@ -41,10 +41,6 @@ export const api = {
   send: (id, body) => request(`/chats/${id}/send`, { method: "POST", body: { body } }),
   release: (id) => request(`/chats/${id}/release`, { method: "POST" }),
 
-  // patients / calendar / doctors
-  patients: () => request("/patients"),
-  patientAppts: (id) => request(`/patients/${id}/appointments`),
-
   // calendar
   calendar: (from, to) =>
     request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
@@ -53,6 +49,10 @@ export const api = {
   doctors: () => request("/schedule/doctors"),
   // doctors: () => request("/doctors"), for local DB
   doctor: (id) => request(`/doctors/${id}`),
+
+  // patients
+  patients: () => request("/schedule/patients"),
+  patient: (id) => request(`/patients/${id}`),
 
   // stats
   stats: () => request("/stats"),

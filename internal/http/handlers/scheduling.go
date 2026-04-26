@@ -46,6 +46,26 @@ func (h *SchedulingHandler) GetDoctors(c *gin.Context) {
 	c.JSON(http.StatusOK, docs)
 }
 
+func (h *SchedulingHandler) GetPatient(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	d, err := h.Svc.GetPatient(c.Request.Context(), cl.ClinicID, c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	c.JSON(http.StatusOK, d)
+}
+
+func (h *SchedulingHandler) GetPatients(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	docs, err := h.Svc.GetPatients(c.Request.Context(), cl.ClinicID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, docs)
+}
+
 func (h *SchedulingHandler) GetSlots(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	var from *time.Time
