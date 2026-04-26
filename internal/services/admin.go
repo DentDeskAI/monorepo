@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -38,7 +39,7 @@ func (s *AdminService) GetClinic(ctx context.Context, clinicID uuid.UUID) (*clin
 	return s.Clinics.Get(ctx, clinicID)
 }
 
-func (s *AdminService) UpdateClinic(ctx context.Context, clinicID uuid.UUID, reqName, reqTimezone, reqWorkingHours, reqSchedulerType string, reqSlotDuration int) (*clinics.Clinic, error) {
+func (s *AdminService) UpdateClinic(ctx context.Context, clinicID uuid.UUID, reqName, reqTimezone string, reqWhatsAppPhoneID *string, reqWorkingHours, reqSchedulerType string, reqSlotDuration int) (*clinics.Clinic, error) {
 	dur := reqSlotDuration
 	if dur == 0 {
 		dur = 30
@@ -52,9 +53,27 @@ func (s *AdminService) UpdateClinic(ctx context.Context, clinicID uuid.UUID, req
 		wh = `{"mon":["09:00","20:00"],"tue":["09:00","20:00"],"wed":["09:00","20:00"],"thu":["09:00","20:00"],"fri":["09:00","20:00"],"sat":["10:00","18:00"],"sun":null}`
 	}
 
+	current, err := s.Clinics.Get(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+
+	whatsAppPhoneID := current.WhatsAppPhoneID
+	if reqWhatsAppPhoneID != nil {
+		trimmed := strings.TrimSpace(*reqWhatsAppPhoneID)
+		if trimmed == "" {
+			whatsAppPhoneID = nil
+		} else {
+			whatsAppPhoneID = &trimmed
+		}
+	}
+
 	if err := s.Clinics.Update(ctx, clinicID, clinics.UpdateFields{
 		Name: reqName, Timezone: reqTimezone,
-		WorkingHours: []byte(wh), SlotDurationMin: dur, SchedulerType: sched,
+		WhatsAppPhoneID: whatsAppPhoneID,
+		WorkingHours:    []byte(wh),
+		SlotDurationMin: dur,
+		SchedulerType:   sched,
 	}); err != nil {
 		return nil, err
 	}

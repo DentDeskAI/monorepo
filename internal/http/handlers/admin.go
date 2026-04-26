@@ -65,6 +65,7 @@ func (h *AdminHandler) GetClinic(c *gin.Context) {
 type updateClinicReq struct {
 	Name            string `json:"name"              binding:"required"`
 	Timezone        string `json:"timezone"          binding:"required"`
+	WhatsAppPhoneID *string `json:"whatsapp_phone_id"`
 	WorkingHours    string `json:"working_hours"`
 	SlotDurationMin int    `json:"slot_duration_min"`
 	SchedulerType   string `json:"scheduler_type"`
@@ -81,7 +82,7 @@ func (h *AdminHandler) UpdateClinic(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 		return
 	}
-	clinic, err := h.Svc.UpdateClinic(c.Request.Context(), cl.ClinicID, req.Name, req.Timezone, req.WorkingHours, req.SchedulerType, req.SlotDurationMin)
+	clinic, err := h.Svc.UpdateClinic(c.Request.Context(), cl.ClinicID, req.Name, req.Timezone, req.WhatsAppPhoneID, req.WorkingHours, req.SchedulerType, req.SlotDurationMin)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

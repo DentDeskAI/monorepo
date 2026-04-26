@@ -150,6 +150,13 @@ func main() {
 		Scheduler:     sched,
 		Hub:           hub,
 	}
+	macDentH := &handlers.MacDentHandler{
+		DB:            database,
+		Redis:         redisClient,
+		Log:           log,
+		PublicBaseURL: cfg.PublicAPIBaseURL,
+		WebhookToken:  cfg.MacDentWebhookToken,
+	}
 
 	router := (&httpx.Router{
 		AuthSvc:   authSvc,
@@ -161,6 +168,7 @@ func main() {
 		ResourceH: resourceH,
 		ScheduleH: scheduleH,
 		WhatsApp:  waH,
+		MacDent:   macDentH,
 	}).Build()
 
 	srv := &http.Server{

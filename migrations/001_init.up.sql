@@ -126,7 +126,7 @@ INSERT INTO users (clinic_id, email, password_hash, role, name)
 VALUES (
     '11111111-1111-1111-1111-111111111111',
     'admin@demo.kz',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    crypt('demo1234', gen_salt('bf')),
     'owner',
     'Демо Админ'
 )

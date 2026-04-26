@@ -14,4 +14,5 @@ RUN apk add --no-cache ca-certificates tzdata && \
     echo "Asia/Almaty" > /etc/timezone
 WORKDIR /app
 COPY --from=builder /out/worker /app/worker
+COPY migrations /app/migrations
 ENTRYPOINT ["/app/worker"]

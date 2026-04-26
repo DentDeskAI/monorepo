@@ -29,6 +29,15 @@ func main() {
 	}
 	defer database.Close()
 
+	if migDir := firstExisting("./migrations", "/app/migrations"); migDir != "" {
+		if err := db.RunMigrations(ctx, database, migDir); err != nil {
+			log.Fatal().Err(err).Msg("migrations")
+		}
+		log.Info().Str("dir", migDir).Msg("migrations applied")
+	} else {
+		log.Warn().Msg("migrations dir not found, skipping")
+	}
+
 	sender := &notifications.Sender{
 		DB:       database,
 		Log:      log,
@@ -36,12 +45,11 @@ func main() {
 		Repo:     appointments.NewRepo(database),
 	}
 
-	// Единый тикер — реминдеры проверяются каждые 5 минут, этого достаточно
-	// для окон 24ч±30м и 2ч±30м. Прод-вариант — разные тикеры.
+	// One ticker is enough here: the worker checks reminders every 5 minutes and
+	// uses wide enough windows for the 24h and 1h reminder jobs.
 	tick := time.NewTicker(5 * time.Minute)
 	defer tick.Stop()
 
-	// сразу первый прогон
 	sender.RunTick(ctx)
 
 	stop := make(chan os.Signal, 1)
@@ -56,4 +64,13 @@ func main() {
 			return
 		}
 	}
+}
+
+func firstExisting(paths ...string) string {
+	for _, p := range paths {
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			return p
+		}
+	}
+	return ""
 }
