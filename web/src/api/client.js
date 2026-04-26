@@ -54,6 +54,9 @@ export const api = {
   patients: () => request("/schedule/patients"),
   patient: (id) => request(`/patients/${id}`),
 
+  // clinic
+  clinic: () => request("/schedule/clinic"),
+
   // stats
   stats: () => request("/stats"),
 
