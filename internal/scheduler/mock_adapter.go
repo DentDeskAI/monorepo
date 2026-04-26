@@ -18,6 +18,16 @@ type MockAdapter struct {
 	held map[string]bool // "doctorID|starts" => true
 }
 
+func (a *MockAdapter) ListPatients(ctx context.Context, clinicID uuid.UUID) ([]Patient, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *MockAdapter) GetPatient(ctx context.Context, clinicID uuid.UUID, id int) (*Patient, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewMockAdapter(db *sqlx.DB) *MockAdapter {
 	return &MockAdapter{db: db, held: map[string]bool{}}
 }

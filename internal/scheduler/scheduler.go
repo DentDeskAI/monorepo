@@ -23,6 +23,34 @@ type Doctor struct {
 	Specialties []string `json:"specialties,omitempty"`
 }
 
+type Patient struct {
+	Name      string  `json:"name"`
+	Gender    *string `json:"gender"` // nullable
+	ID        int     `json:"id"`
+	IIN       *string `json:"iin"` // nullable
+	Number    string  `json:"number"`
+	Phone     *string `json:"phone"` // nullable
+	Birth     *string `json:"birth"` // nullable (could be time.Time if formatted)
+	IsChild   bool    `json:"isChild"`
+	Comment   string  `json:"comment"`
+	WhereKnow string  `json:"whereKnow"`
+}
+
+func toSchedulerPatient(p Patient) Patient {
+	return Patient{
+		Name:      p.Name,
+		Gender:    p.Gender,
+		ID:        p.ID,
+		IIN:       p.IIN,
+		Number:    p.Number,
+		Phone:     p.Phone,
+		Birth:     p.Birth,
+		IsChild:   p.IsChild,
+		Comment:   p.Comment,
+		WhereKnow: p.WhereKnow,
+	}
+}
+
 type BookRequest struct {
 	ClinicID  uuid.UUID
 	PatientID uuid.UUID
@@ -43,6 +71,8 @@ type BookResult struct {
 type Scheduler interface {
 	ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error)
 	GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*Doctor, error)
+	ListPatients(ctx context.Context, clinicID uuid.UUID) ([]Patient, error)
+	GetPatient(ctx context.Context, clinicID uuid.UUID, id int) (*Patient, error)
 	GetFreeSlots(ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string) ([]Slot, error)
 	CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error)
 	CancelAppointment(ctx context.Context, appointmentID uuid.UUID) error
