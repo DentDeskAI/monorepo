@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -38,6 +39,24 @@ func (a *MockAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Do
 		out[i] = Doctor{ID: r.ID.String(), Name: r.Name, Specialties: []string{r.Specialties}}
 	}
 	return out, nil
+}
+
+func (a *MockAdapter) GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*Doctor, error) {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("bad id: %w", err)
+	}
+	var row struct {
+		ID        uuid.UUID `db:"id"`
+		Name      string    `db:"name"`
+		Specialty string    `db:"specialty"`
+	}
+	if err := a.db.GetContext(ctx, &row,
+		`SELECT id, name, specialty FROM doctors WHERE id=$1 AND clinic_id=$2 AND active=TRUE`,
+		uid, clinicID); err != nil {
+		return nil, err
+	}
+	return &Doctor{ID: row.ID.String(), Name: row.Name, Specialties: []string{row.Specialty}}, nil
 }
 
 func (a *MockAdapter) GetFreeSlots(ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string) ([]Slot, error) {

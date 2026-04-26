@@ -114,6 +114,19 @@ func (a *MacDentAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([
 	return out, nil
 }
 
+func (a *MacDentAdapter) GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*Doctor, error) {
+	list, err := a.ListDoctors(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range list {
+		if d.ID == id {
+			return &d, nil
+		}
+	}
+	return nil, fmt.Errorf("doctor %s not found", id)
+}
+
 func (a *MacDentAdapter) listDoctors(ctx context.Context, apiKey string) ([]mdDoctor, error) {
 	b, err := a.get(ctx, apiKey, "/doctor/find", nil)
 	if err != nil {

@@ -126,7 +126,7 @@ export default function Doctors() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="p-3 bg-slate-50 rounded-lg">
                                             <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Специальносьти:</div>
-                                            <div className="text-slate-700">{(selected.specialties || []).join(", ")}</div>
+                                            <div className="text-slate-700">{(selected.specialties || []).join(", ") || "Не найдено" }</div>
                                         </div>
                                     </div>
                                 </div>

@@ -42,6 +42,7 @@ type BookResult struct {
 // LocalAdapter хранит в нашей PG. MacDentAdapter ходит в чужой API.
 type Scheduler interface {
 	ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error)
+	GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*Doctor, error)
 	GetFreeSlots(ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string) ([]Slot, error)
 	CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error)
 	CancelAppointment(ctx context.Context, appointmentID uuid.UUID) error
