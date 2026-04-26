@@ -101,17 +101,30 @@ func (a *MacDentAdapter) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([
 	}
 	out := make([]Doctor, 0, len(mds))
 	for _, d := range mds {
-		spec := ""
-		if len(d.Specialnosti) > 0 {
-			spec = d.Specialnosti[0].Name
+		spec := make([]string, 0, len(d.Specialnosti))
+		for _, s := range d.Specialnosti {
+			spec = append(spec, s.Name)
 		}
 		out = append(out, Doctor{
-			ID:        fmt.Sprint(d.ID),
-			Name:      d.Name,
-			Specialty: spec,
+			ID:          fmt.Sprint(d.ID),
+			Name:        d.Name,
+			Specialties: spec,
 		})
 	}
 	return out, nil
+}
+
+func (a *MacDentAdapter) GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*Doctor, error) {
+	list, err := a.ListDoctors(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range list {
+		if d.ID == id {
+			return &d, nil
+		}
+	}
+	return nil, fmt.Errorf("doctor %s not found", id)
 }
 
 func (a *MacDentAdapter) listDoctors(ctx context.Context, apiKey string) ([]mdDoctor, error) {

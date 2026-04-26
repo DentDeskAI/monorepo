@@ -87,9 +87,9 @@ func (r *Router) Build() *gin.Engine {
 		api.GET("/patients/:id/appointments", r.CRMH.PatientAppointments)
 
 		// Doctors
-		api.GET("/doctors", r.CRMH.ListDoctors)
+		api.GET("/doctors", r.ScheduleH.GetDoctors)
 		api.POST("/doctors", r.ResourceH.CreateDoctor)
-		api.GET("/doctors/:id", r.ResourceH.GetDoctor)
+		api.GET("/doctors/:id", r.ScheduleH.GetDoctor)
 		api.PUT("/doctors/:id", r.ResourceH.UpdateDoctor)
 		api.DELETE("/doctors/:id", r.ResourceH.DeactivateDoctor)
 
@@ -101,6 +101,7 @@ func (r *Router) Build() *gin.Engine {
 
 		// Scheduling
 		api.GET("/schedule/doctors", r.ScheduleH.GetDoctors)
+		api.POST("/schedule/doctors/sync", r.ScheduleH.SyncDoctors)
 		api.GET("/slots", r.ScheduleH.GetSlots)
 		api.POST("/appointments", r.ScheduleH.CreateAppointment)
 		api.GET("/appointments/:id", r.ScheduleH.GetAppointment)

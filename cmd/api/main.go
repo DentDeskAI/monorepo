@@ -129,7 +129,7 @@ func main() {
 	authSvc := auth.NewService(database, cfg.JWTSecret)
 	adminSvc := services.NewAdminService(authSvc, clinicsRepo)
 	resourceSvc := services.NewResourceService(doctorsRepo, chairsRepo, patientsRepo)
-	schedulingSvc := services.NewSchedulingService(apptRepo, convRepo, sched)
+	schedulingSvc := services.NewSchedulingService(apptRepo, convRepo, sched, doctorsRepo)
 	crmSvc := services.NewCRMService(database, patientsRepo, convRepo, apptRepo, doctorsRepo, hub, waClient)
 
 	// --- Handlers ---
