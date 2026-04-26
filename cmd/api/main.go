@@ -80,18 +80,10 @@ func main() {
 	doctorsRepo := doctors.NewRepo(database)
 
 	// --- Scheduler ---
-	var sched scheduler.Scheduler
-	switch cfg.SchedulerDefault {
-	case "mock":
-		sched = scheduler.NewMockAdapter(database)
-		log.Info().Msg("scheduler: mock")
-	case "macdent":
-		sched = scheduler.NewMacDentAdapter(database)
-		log.Info().Msg("scheduler: macdent")
-	default:
-		sched = scheduler.NewLocalAdapter(database)
-		log.Info().Msg("scheduler: local")
-	}
+	// Single concrete service backed by the MacDent integration.
+	// When a second integration appears, introduce an interface here.
+	sched := scheduler.NewService(database)
+	log.Info().Msg("scheduler: ready (macdent integration)")
 
 	// --- LLM ---
 	var llmClient llm.Client
@@ -137,7 +129,7 @@ func main() {
 	adminH := &handlers.AdminHandler{Svc: adminSvc}
 	crmH := &handlers.CRMHandler{Svc: crmSvc}
 	resourceH := &handlers.ResourceHandler{Svc: resourceSvc}
-	scheduleH := &handlers.SchedulingHandler{Svc: schedulingSvc}
+	scheduleH := &handlers.SchedulingHandler{Sched: sched, Svc: schedulingSvc}
 	waH := &handlers.WhatsAppHandler{
 		DB:            database,
 		Redis:         redisClient,
