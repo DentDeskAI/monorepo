@@ -102,6 +102,8 @@ func (r *Router) Build() *gin.Engine {
 		// Scheduling
 		api.GET("/schedule/doctors", r.ScheduleH.GetDoctors)
 		api.POST("/schedule/doctors/sync", r.ScheduleH.SyncDoctors)
+		api.GET("/schedule/patients", r.ScheduleH.GetPatients)
+		api.GET("/schedule/patients/:id", r.ScheduleH.GetPatient)
 		api.GET("/slots", r.ScheduleH.GetSlots)
 		api.POST("/appointments", r.ScheduleH.CreateAppointment)
 		api.GET("/appointments/:id", r.ScheduleH.GetAppointment)

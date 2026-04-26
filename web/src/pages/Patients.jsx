@@ -34,7 +34,7 @@ export default function Patients() {
         .finally(() => setLoadingList(false));
   }, []);
 
-  // 2. Fetch patient details
+  // 2. Fetch patient history
   useEffect(() => {
     if (!selected) {
       setAppts([]);
@@ -143,8 +143,24 @@ export default function Patients() {
                   </div>
                 </div>
 
-                {/* History */}
+                {/* Info + History */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+
+                  <h2 className="font-semibold text-slate-900 mb-4">
+                    Информация о пациенте
+                  </h2>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                    <Info label="ID" value={selected.id} />
+                    <Info label="Телефон" value={selected.phone} />
+                    <Info label="Номер" value={selected.number} />
+                    <Info label="Пол" value={selected.gender} />
+                    <Info label="Дата рождения" value={selected.birth} />
+                    <Info label="Ребёнок" value={selected.isChild ? "Да" : "Нет"} />
+                    <Info label="Источник" value={selected.whereKnow} />
+                    <Info label="Комментарий" value={selected.comment} />
+                  </div>
+
                   <h2 className="font-semibold text-slate-900 mb-4 flex items-center justify-between">
                     История
                     {loadingDetails && (
@@ -153,8 +169,8 @@ export default function Patients() {
                   </h2>
 
                   {appts.length === 0 ? (
-                      <div className="py-4 text-sm text-slate-500">
-                        Нет данных
+                      <div className="py-4 text-sm text-slate-400">
+                        История отсутствует
                       </div>
                   ) : (
                       <ul className="divide-y divide-slate-100">
@@ -183,6 +199,17 @@ export default function Patients() {
 }
 
 // utils
+
+function Info({ label, value }) {
+  return (
+      <div className="p-3 bg-slate-50 rounded-lg">
+        <div className="text-[10px] uppercase text-slate-400 font-bold tracking-wide">
+          {label}
+        </div>
+        <div className="text-slate-700">{value || "—"}</div>
+      </div>
+  );
+}
 
 function formatDate(v) {
   try {
