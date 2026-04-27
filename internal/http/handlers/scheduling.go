@@ -3,17 +3,23 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/dentdesk/dentdesk/internal/http/middleware"
+	"github.com/dentdesk/dentdesk/internal/scheduler"
 	"github.com/dentdesk/dentdesk/internal/services"
 )
 
+// SchedulingHandler exposes scheduling endpoints. Pure read endpoints call the
+// scheduler.Service directly (no business logic to add). Endpoints with
+// validation or DB writes go through the SchedulingService.
 type SchedulingHandler struct {
-	Svc *services.SchedulingService
+	Sched *scheduler.Service
+	Svc   *services.SchedulingService
 }
 
 func (h *SchedulingHandler) SyncDoctors(c *gin.Context) {
@@ -28,7 +34,7 @@ func (h *SchedulingHandler) SyncDoctors(c *gin.Context) {
 
 func (h *SchedulingHandler) GetDoctor(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
-	d, err := h.Svc.GetDoctor(c.Request.Context(), cl.ClinicID, c.Param("id"))
+	d, err := h.Sched.GetDoctor(c.Request.Context(), cl.ClinicID, c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
@@ -38,7 +44,7 @@ func (h *SchedulingHandler) GetDoctor(c *gin.Context) {
 
 func (h *SchedulingHandler) GetDoctors(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
-	docs, err := h.Svc.GetDoctors(c.Request.Context(), cl.ClinicID)
+	docs, err := h.Sched.ListDoctors(c.Request.Context(), cl.ClinicID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -48,22 +54,37 @@ func (h *SchedulingHandler) GetDoctors(c *gin.Context) {
 
 func (h *SchedulingHandler) GetPatient(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
-	d, err := h.Svc.GetPatient(c.Request.Context(), cl.ClinicID, c.Param("id"))
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+		return
+	}
+	p, err := h.Sched.GetPatient(c.Request.Context(), cl.ClinicID, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
-	c.JSON(http.StatusOK, d)
+	c.JSON(http.StatusOK, p)
 }
 
 func (h *SchedulingHandler) GetPatients(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
-	docs, err := h.Svc.GetPatients(c.Request.Context(), cl.ClinicID)
+	docs, err := h.Sched.ListPatients(c.Request.Context(), cl.ClinicID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, docs)
+}
+
+func (h *SchedulingHandler) GetClinic(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	stom, err := h.Sched.GetClinic(c.Request.Context(), cl.ClinicID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stom)
 }
 
 func (h *SchedulingHandler) GetSlots(c *gin.Context) {

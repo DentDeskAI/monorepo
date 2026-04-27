@@ -46,13 +46,15 @@ export const api = {
     request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
 
   // doctors
-  doctors: () => request("/schedule/doctors"),
-  // doctors: () => request("/doctors"), for local DB
+  doctors: () => request("/doctors"),
   doctor: (id) => request(`/doctors/${id}`),
 
   // patients
-  patients: () => request("/schedule/patients"),
+  patients: () => request("/patients"),
   patient: (id) => request(`/patients/${id}`),
+
+  // clinic
+  clinic: () => request("/clinic"),
 
   // stats
   stats: () => request("/stats"),
