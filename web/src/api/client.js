@@ -44,6 +44,7 @@ export const api = {
   // calendar
   calendar: (from, to) =>
     request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  scheduleDoctors: () => request("/schedule/doctors"),
 
   // doctors
   doctors: () => request("/doctors"),
