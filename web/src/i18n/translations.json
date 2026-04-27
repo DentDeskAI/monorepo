@@ -1,0 +1,329 @@
+{
+  "ru": {
+    "common": {
+      "id": "ID",
+      "phone": "Телефон",
+      "gender": "Пол",
+      "dob": "Дата рождения",
+      "yes": "Да",
+      "no": "Нет",
+      "no_contact": "Нет контакта",
+      "no_phone": "Нет телефона",
+      "no_patient": "Нет пациента",
+      "loading": "Загрузка...",
+      "status": {
+        "scheduled": "Запланировано",
+        "confirmed": "Подтверждено",
+        "completed": "Завершено",
+        "cancelled": "Отменено"
+      }
+    },
+    "login": {
+      "title": "DentDesk",
+      "subtitle": "Mini-CRM для стоматологий",
+      "email_label": "Email",
+      "password_label": "Пароль",
+      "submit": "Войти",
+      "loading": "Входим...",
+      "error": "Неверный email или пароль",
+      "demo_hint": "Demo:",
+      "demo_email": "admin@demo.kz",
+      "demo_pass": "demo1234"
+    },
+    "patients": {
+      "title": "Пациенты",
+      "search_placeholder": "Поиск по имени или телефону",
+      "empty_state": "Ничего не найдено",
+      "unknown_patient": "Неизвестный пациент",
+      "child": "Ребёнок",
+      "profile_info": "Информация о пациенте",
+      "history_title": "История",
+      "history_empty": "История отсутствует",
+      "number": "Номер",
+      "is_child": "Ребёнок",
+      "source": "Источник",
+      "comment": "Комментарий"
+    },
+    "doctors": {
+      "title": "Докторы",
+      "search_placeholder": "Поиск по имени или телефону",
+      "empty_state": "Ничего не найдено",
+      "unknown_doctor": "Неизвестный доктор",
+      "profile_info": "Специальности",
+      "history_title": "История",
+      "history_empty": "История отсутствует",
+      "specialty": "Специальности",
+      "no_specialty": "Не найдено"
+    },
+    "calendar": {
+      "title": "Календарь",
+      "subtitle": "Записи в клинике за неделю",
+      "loading": "Загружаем...",
+      "today": "Сегодня",
+      "prev_week": "Неделя",
+      "next_week": "Неделя",
+      "no_patient": "Пациент",
+      "days": {
+        "mon": "Пн",
+        "tue": "Вт",
+        "wed": "Ср",
+        "thu": "Чт",
+        "fri": "Пт",
+        "sat": "Сб",
+        "sun": "Вс"
+      }
+    },
+    "chats": {
+      "title": "Чаты",
+      "count": "диалогов",
+      "empty": "Пока нет чатов",
+      "select_chat": "Выберите чат слева",
+      "operator": "оператор",
+      "return_to_bot": "Вернуть боту",
+      "placeholder": "Написать как оператор (бот замолчит)...",
+      "send": "Отправить",
+      "sending": "...",
+      "send_failed": "Не удалось отправить",
+      "chat_fallback": "Чат",
+      "loading": "Загружаем...",
+      "info_text": "Отправка сообщения переключает чат в режим оператора. Чтобы вернуть бота — кнопка сверху.",
+      "sender": {
+        "operator": "оператор",
+        "aigul": "Айгуль",
+        "patient": "пациент"
+      }
+    },
+    "layout": {
+      "online": "Айгуль online",
+      "language": "Язык",
+      "theme_dark": "Тёмная тема",
+      "theme_light": "Светлая тема",
+      "logout": "Выйти",
+      "nav": {
+        "dashboard": "Главная",
+        "chats": "Чаты",
+        "calendar": "Календарь",
+        "patients": "Пациенты",
+        "doctors": "Докторы"
+      }
+    }
+  },
+  "en": {
+    "common": {
+      "id": "ID",
+      "phone": "Phone",
+      "gender": "Gender",
+      "dob": "Date of Birth",
+      "yes": "Yes",
+      "no": "No",
+      "no_contact": "No contact",
+      "no_phone": "No phone",
+      "no_patient": "No patient",
+      "loading": "Loading...",
+      "status": {
+        "scheduled": "Scheduled",
+        "confirmed": "Confirmed",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      }
+    },
+    "login": {
+      "title": "DentDesk",
+      "subtitle": "Mini-CRM for dental clinics",
+      "email_label": "Email",
+      "password_label": "Password",
+      "submit": "Sign in",
+      "loading": "Signing in...",
+      "error": "Invalid email or password",
+      "demo_hint": "Demo:",
+      "demo_email": "admin@demo.kz",
+      "demo_pass": "demo1234"
+    },
+    "patients": {
+      "title": "Patients",
+      "search_placeholder": "Search by name or phone",
+      "empty_state": "Nothing found",
+      "unknown_patient": "Unknown patient",
+      "child": "Child",
+      "profile_info": "Patient info",
+      "history_title": "History",
+      "history_empty": "No history",
+      "number": "Number",
+      "is_child": "Child",
+      "source": "Source",
+      "comment": "Comment"
+    },
+    "doctors": {
+      "title": "Doctors",
+      "search_placeholder": "Search by name or phone",
+      "empty_state": "Nothing found",
+      "unknown_doctor": "Unknown doctor",
+      "profile_info": "Specialties",
+      "history_title": "History",
+      "history_empty": "No history",
+      "specialty": "Specialties",
+      "no_specialty": "Not found"
+    },
+    "calendar": {
+      "title": "Calendar",
+      "subtitle": "Clinic appointments for the week",
+      "loading": "Loading...",
+      "today": "Today",
+      "prev_week": "Week",
+      "next_week": "Week",
+      "no_patient": "Patient",
+      "days": {
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat",
+        "sun": "Sun"
+      }
+    },
+    "chats": {
+      "title": "Chats",
+      "count": "conversations",
+      "empty": "No chats yet",
+      "select_chat": "Select a chat on the left",
+      "operator": "operator",
+      "return_to_bot": "Return to bot",
+      "placeholder": "Write as operator (bot will go silent)...",
+      "send": "Send",
+      "sending": "...",
+      "send_failed": "Failed to send",
+      "chat_fallback": "Chat",
+      "loading": "Loading...",
+      "info_text": "Sending a message switches the chat to operator mode. Use the button above to return the bot.",
+      "sender": {
+        "operator": "operator",
+        "aigul": "Aigul",
+        "patient": "patient"
+      }
+    },
+    "layout": {
+      "online": "Aigul online",
+      "language": "Language",
+      "theme_dark": "Dark theme",
+      "theme_light": "Light theme",
+      "logout": "Logout",
+      "nav": {
+        "dashboard": "Dashboard",
+        "chats": "Chats",
+        "calendar": "Calendar",
+        "patients": "Patients",
+        "doctors": "Doctors"
+      }
+    }
+  },
+  "kz": {
+    "common": {
+      "id": "ID",
+      "phone": "Телефон",
+      "gender": "Жынысы",
+      "dob": "Туған күні",
+      "yes": "Иә",
+      "no": "Жоқ",
+      "no_contact": "Байланыс жоқ",
+      "no_phone": "Телефон жоқ",
+      "no_patient": "Науқас жоқ",
+      "loading": "Жүктелуде...",
+      "status": {
+        "scheduled": "Жоспарланды",
+        "confirmed": "Расталды",
+        "completed": "Аяқталды",
+        "cancelled": "Бас тартылды"
+      }
+    },
+    "login": {
+      "title": "DentDesk",
+      "subtitle": "Тіс емханасына арналған Mini-CRM",
+      "email_label": "Email",
+      "password_label": "Құпия сөз",
+      "submit": "Кіру",
+      "loading": "Кіруде...",
+      "error": "Қате email немесе құпия сөз",
+      "demo_hint": "Demo:",
+      "demo_email": "admin@demo.kz",
+      "demo_pass": "demo1234"
+    },
+    "patients": {
+      "title": "Науқастар",
+      "search_placeholder": "Аты немесе телефон бойынша іздеу",
+      "empty_state": "Ештеңе табылмады",
+      "unknown_patient": "Белгісіз науқас",
+      "child": "Бала",
+      "profile_info": "Науқас туралы ақпарат",
+      "history_title": "Тарих",
+      "history_empty": "Тарих жоқ",
+      "number": "Нөмір",
+      "is_child": "Бала",
+      "source": "Қайнар көзі",
+      "comment": "Пікір"
+    },
+    "doctors": {
+      "title": "Дәрігерлер",
+      "search_placeholder": "Аты немесе телефон бойынша іздеу",
+      "empty_state": "Ештеңе табылмады",
+      "unknown_doctor": "Белгісіз дәрігер",
+      "profile_info": "Мамандықтар",
+      "history_title": "Тарих",
+      "history_empty": "Тарих жоқ",
+      "specialty": "Мамандықтар",
+      "no_specialty": "Табылмады"
+    },
+    "calendar": {
+      "title": "Күнтізбе",
+      "subtitle": "Емханадағы апталық жазбалар",
+      "loading": "Жүктелуде...",
+      "today": "Бүгін",
+      "prev_week": "Апта",
+      "next_week": "Апта",
+      "no_patient": "Науқас",
+      "days": {
+        "mon": "Дс",
+        "tue": "Сс",
+        "wed": "Ср",
+        "thu": "Бс",
+        "fri": "Жм",
+        "sat": "Сн",
+        "sun": "Жк"
+      }
+    },
+    "chats": {
+      "title": "Чаттар",
+      "count": "диалог",
+      "empty": "Чаттар жоқ",
+      "select_chat": "Солдан чат таңдаңыз",
+      "operator": "оператор",
+      "return_to_bot": "Ботқа қайтару",
+      "placeholder": "Оператор ретінде жазу (бот үнсіз қалады)...",
+      "send": "Жіберу",
+      "sending": "...",
+      "send_failed": "Жіберілмеді",
+      "chat_fallback": "Чат",
+      "loading": "Жүктелуде...",
+      "info_text": "Хабар жіберу чатты оператор режиміне ауыстырады. Ботты қайтару үшін жоғарыдағы батырманы басыңыз.",
+      "sender": {
+        "operator": "оператор",
+        "aigul": "Айгүл",
+        "patient": "науқас"
+      }
+    },
+    "layout": {
+      "online": "Айгүл online",
+      "language": "Тіл",
+      "theme_dark": "Қараңғы тема",
+      "theme_light": "Ашық тема",
+      "logout": "Шығу",
+      "nav": {
+        "dashboard": "Басты бет",
+        "chats": "Чаттар",
+        "calendar": "Күнтізбе",
+        "patients": "Науқастар",
+        "doctors": "Дәрігерлер"
+      }
+    }
+  }
+}
