@@ -24,6 +24,28 @@ const i18nKeys = {
   },
 };
 
+// Parses MacDent date strings like "28.04.2026 10:45:00"
+function parseMacdentDate(s) {
+  const [datePart, timePart = "00:00:00"] = s.split(" ");
+  const [d, m, y] = datePart.split(".");
+  const [h, min, sec] = timePart.split(":");
+  return new Date(+y, +m - 1, +d, +h, +min, +sec);
+}
+
+// MacDent integer status → local status string
+const MD_STATUS = { 0: "scheduled", 1: "confirmed", 2: "cancelled" };
+
+function normalizeMacdent(a) {
+  return {
+    id: a.id,
+    starts_at: parseMacdentDate(a.start),
+    patient_name: a.cabinet || null, // Using cabinet as location placeholder
+    patient_phone: null,
+    doctor_name: null,
+    status: MD_STATUS[a.status] ?? "completed",
+  };
+}
+
 function startOfWeek(d) {
   const x = new Date(d);
   const day = (x.getDay() + 6) % 7; // Mon=0
@@ -37,17 +59,19 @@ export default function Calendar() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   const daysShort = useMemo(
-    () => [
-      t(i18nKeys.days.mon),
-      t(i18nKeys.days.tue),
-      t(i18nKeys.days.wed),
-      t(i18nKeys.days.thu),
-      t(i18nKeys.days.fri),
-      t(i18nKeys.days.sat),
-      t(i18nKeys.days.sun),
-    ],
-    [t]
+      () => [
+        t(i18nKeys.days.mon),
+        t(i18nKeys.days.tue),
+        t(i18nKeys.days.wed),
+        t(i18nKeys.days.thu),
+        t(i18nKeys.days.fri),
+        t(i18nKeys.days.sat),
+        t(i18nKeys.days.sun),
+      ],
+      [t]
   );
 
   const weekEnd = useMemo(() => {
@@ -58,16 +82,33 @@ export default function Calendar() {
 
   useEffect(() => {
     setLoading(true);
-    api.calendar(weekStart.toISOString(), weekEnd.toISOString())
-        .then(setItems)
-        .catch(() => setItems([]))
+    setError(null);
+    api
+        .scheduleDoctors()
+        .then((resp) => {
+          if (resp && resp.appointments) {
+            const items = resp.appointments
+                .map(normalizeMacdent)
+                .filter(({ starts_at }) => {
+                  return starts_at >= weekStart && starts_at < weekEnd;
+                });
+            setItems(items);
+          } else {
+            setItems([]);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch schedule:", err);
+          setError("Failed to load schedule");
+          setItems([]);
+        })
         .finally(() => setLoading(false));
   }, [weekStart, weekEnd]);
 
   const byDayHour = useMemo(() => {
     const m = {};
     for (const a of items) {
-      const d = new Date(a.starts_at);
+      const d = a.starts_at;
       const dayIdx = (d.getDay() + 6) % 7;
       const key = `${dayIdx}-${d.getHours()}`;
       if (!m[key]) m[key] = [];
@@ -91,7 +132,6 @@ export default function Calendar() {
 
   return (
       <div className="h-full flex flex-col bg-[#F7F8FA] dark:bg-slate-900">
-
         {/* TOP BAR */}
         <div className="h-16 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0">
           <div>
@@ -128,10 +168,22 @@ export default function Calendar() {
         </div>
 
         {/* CALENDAR GRID */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6 relative">
           {loading && (
-              <div className="flex items-center justify-center h-full text-sm text-slate-400">
-                {t(i18nKeys.calendar.loading)}
+              <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 z-10">
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {t(i18nKeys.calendar.loading)}
+                </div>
+              </div>
+          )}
+
+          {error && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-slate-900 z-10">
+                <div className="text-red-500 text-sm">{error}</div>
               </div>
           )}
 
@@ -178,15 +230,16 @@ export default function Calendar() {
                               className="min-h-[80px] border-r border-b border-slate-100 dark:border-slate-700 p-1 space-y-1.5 hover:bg-slate-50/30 dark:hover:bg-slate-700/20 transition-colors"
                           >
                             {cellItems.map((a) => {
-                              const d = new Date(a.starts_at);
                               const isCancelled = a.status === "cancelled";
+                              const d = a.starts_at;
+
                               return (
                                   <div
                                       key={a.id}
-                                      className={`text-[11px] px-2 py-1.5 rounded border transition-all ${
+                                      className={`text-[11px] px-2 py-1.5 rounded border transition-all cursor-pointer ${
                                           isCancelled
                                               ? "bg-slate-50 dark:bg-slate-700 text-slate-400 border-slate-100 dark:border-slate-600 line-through"
-                                              : "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-800 shadow-sm"
+                                              : "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-800 shadow-sm hover:shadow-md"
                                       }`}
                                   >
                                     <div className="font-bold mb-0.5">

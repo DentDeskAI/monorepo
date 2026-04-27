@@ -69,6 +69,25 @@ type BookResult struct {
 	ExternalID    *string
 }
 
+type Appointment struct {
+	ID      int    `json:"id"`
+	Doctor  int    `json:"doctor"`
+	Patient int    `json:"patient"`
+	Date    string `json:"date"`
+	Start   string `json:"start"`
+	End     string `json:"end"`
+	Status  int    `json:"status"`
+	Zhaloba string `json:"zhaloba"`
+	Comment string `json:"comment"`
+	IsFirst bool   `json:"isFirst"`
+	Cabinet string `json:"cabinet"`
+	Rasp    string `json:"rasp"`
+}
+
+type AppointmentsResponse struct {
+	Appointments []Appointment `json:"appointments"`
+}
+
 // ── service ──────────────────────────────────────────────────────────────────
 
 // Service is DentDesk's scheduling service. It's a single concrete type — no
@@ -186,6 +205,60 @@ func (s *Service) GetClinic(ctx context.Context, clinicID uuid.UUID) (*Stomatolo
 	return &Stomatology{ID: stom.ID, Name: stom.Name}, nil
 }
 
+// ── appointments (zapis) ─────────────────────────────────────────────────────
+
+func (s *Service) ListAppointments(ctx context.Context, id uuid.UUID) (*AppointmentsResponse, error) {
+	c, err := s.macdent(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	apps, err := c.GetAppointments(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]Appointment, 0, len(apps.Appointments))
+	for _, a := range apps.Appointments {
+		out = append(out, Appointment{
+			ID:      a.ID,
+			Doctor:  a.Doctor,
+			Patient: a.Patient,
+			Date:    a.Date,
+			Start:   a.Start,
+			End:     a.End,
+			Status:  a.Status,
+			Zhaloba: a.Zhaloba,
+			Comment: a.Comment,
+			IsFirst: a.IsFirst,
+			Cabinet: a.Cabinet,
+			Rasp:    a.Rasp,
+		})
+	}
+
+	return &AppointmentsResponse{Appointments: out}, nil
+}
+
+func (s *Service) CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error) {
+	c, err := s.macdent(ctx, req.ClinicID)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: resolve MacDent integer doctor ID from req.DoctorID (UUID → external_id lookup)
+	z, err := c.AddZapis(ctx, 0, req.StartsAt, req.EndsAt, req.Service)
+	if err != nil {
+		return nil, err
+	}
+	ext := fmt.Sprint(z.ID)
+	return &BookResult{AppointmentID: uuid.New(), ExternalID: &ext}, nil
+}
+//
+//func (s *Service) CancelAppointment(ctx context.Context, appointmentID uuid.UUID) error {
+//	// TODO: resolve MacDent integer zapis ID from appointmentID (external_id lookup) then call SetStatus(id, 2)
+//	_ = appointmentID
+//	return nil
+//}
+
 // ── slots ────────────────────────────────────────────────────────────────────
 
 func (s *Service) GetFreeSlots(
@@ -222,26 +295,4 @@ func (s *Service) GetFreeSlots(
 		}
 	}
 	return slots, nil
-}
-
-// ── appointments (zapis) ─────────────────────────────────────────────────────
-
-func (s *Service) CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error) {
-	c, err := s.macdent(ctx, req.ClinicID)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: resolve MacDent integer doctor ID from req.DoctorID (UUID → external_id lookup)
-	z, err := c.AddZapis(ctx, 0, req.StartsAt, req.EndsAt, req.Service)
-	if err != nil {
-		return nil, err
-	}
-	ext := fmt.Sprint(z.ID)
-	return &BookResult{AppointmentID: uuid.New(), ExternalID: &ext}, nil
-}
-
-func (s *Service) CancelAppointment(ctx context.Context, appointmentID uuid.UUID) error {
-	// TODO: resolve MacDent integer zapis ID from appointmentID (external_id lookup) then call SetStatus(id, 2)
-	_ = appointmentID
-	return nil
 }

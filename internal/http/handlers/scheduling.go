@@ -199,3 +199,13 @@ func (h *SchedulingHandler) CloseConversation(c *gin.Context) {
 	}
 	c.Status(http.StatusNoContent)
 }
+
+func (h *SchedulingHandler) ListAppointments(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	docs, err := h.Sched.ListAppointments(c.Request.Context(), cl.ClinicID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, docs)
+}
