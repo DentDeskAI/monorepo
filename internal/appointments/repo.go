@@ -102,7 +102,7 @@ func (r *Repo) DueForReminder24h(ctx context.Context, now time.Time) ([]Appointm
 }
 
 // DueForReminder2h — записи через ~2ч.
-func (r *Repo) DueForReminder2h(ctx context.Context, now time.Time) ([]Appointment, error) {
+func (r *Repo) DueForReminder1h(ctx context.Context, now time.Time) ([]Appointment, error) {
 	var out []Appointment
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT a.id, a.clinic_id, a.patient_id, a.doctor_id, a.chair_id, a.external_id,
@@ -113,10 +113,10 @@ func (r *Repo) DueForReminder2h(ctx context.Context, now time.Time) ([]Appointme
 		 JOIN patients p ON p.id = a.patient_id
 		 LEFT JOIN doctors d ON d.id = a.doctor_id
 		 WHERE a.status IN ('scheduled','confirmed')
-		   AND a.reminder_2h_sent_at IS NULL
+		   AND a.reminder_1h_sent_at IS NULL
 		   AND a.starts_at BETWEEN $1 AND $2`,
-		now.Add(1*time.Hour+30*time.Minute),
-		now.Add(2*time.Hour+30*time.Minute),
+		now.Add(50*time.Minute),
+		now.Add(70*time.Minute),
 	)
 	return out, err
 }
@@ -145,9 +145,9 @@ func (r *Repo) MarkReminder24hSent(ctx context.Context, id uuid.UUID) error {
 		`UPDATE appointments SET reminder_24h_sent_at=NOW() WHERE id=$1`, id)
 	return err
 }
-func (r *Repo) MarkReminder2hSent(ctx context.Context, id uuid.UUID) error {
+func (r *Repo) MarkReminder1hSent(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE appointments SET reminder_2h_sent_at=NOW() WHERE id=$1`, id)
+		`UPDATE appointments SET reminder_1h_sent_at=NOW() WHERE id=$1`, id)
 	return err
 }
 func (r *Repo) MarkFollowupSent(ctx context.Context, id uuid.UUID) error {

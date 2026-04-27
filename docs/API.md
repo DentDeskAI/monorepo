@@ -7,8 +7,8 @@ cp .env.example .env
 # по желанию — добавить ANTHROPIC_API_KEY и WHATSAPP_* ключи
 docker compose up -d --build
 
-# CRM:  http://localhost:5173
-# API:  http://localhost:8080
+# CRM:  http://localhost:3000
+# API:  http://localhost:8082
 # Demo: admin@demo.kz / demo1234
 ```
 
@@ -21,7 +21,7 @@ docker compose up -d --build
 ### Login
 
 ```bash
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:8082/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@demo.kz","password":"demo1234"}'
 ```
@@ -41,21 +41,21 @@ curl -X POST http://localhost:8080/api/auth/login \
 ### Список чатов
 
 ```bash
-curl http://localhost:8080/api/chats \
+curl http://localhost:8082/api/chats \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
 ### История сообщений
 
 ```bash
-curl http://localhost:8080/api/chats/<conv_id>/messages \
+curl http://localhost:8082/api/chats/<conv_id>/messages \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
 ### Отправить от имени оператора (бот замолкает)
 
 ```bash
-curl -X POST http://localhost:8080/api/chats/<conv_id>/send \
+curl -X POST http://localhost:8082/api/chats/<conv_id>/send \
   -H "Authorization: Bearer <TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"body":"Добрый день! Это Марина из регистратуры."}'
@@ -64,21 +64,21 @@ curl -X POST http://localhost:8080/api/chats/<conv_id>/send \
 ### Вернуть диалог боту
 
 ```bash
-curl -X POST http://localhost:8080/api/chats/<conv_id>/release \
+curl -X POST http://localhost:8082/api/chats/<conv_id>/release \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
 ### Календарь
 
 ```bash
-curl "http://localhost:8080/api/calendar?from=2026-04-24T00:00:00Z&to=2026-05-01T00:00:00Z" \
+curl "http://localhost:8082/api/calendar?from=2026-04-24T00:00:00Z&to=2026-05-01T00:00:00Z" \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
 ### SSE (real-time)
 
 ```bash
-curl -N "http://localhost:8080/api/events?token=<TOKEN>"
+curl -N "http://localhost:8082/api/events?token=<TOKEN>"
 ```
 
 Отдаёт events типов `message` и `appointment`.
@@ -100,7 +100,7 @@ GET /webhook/whatsapp?hub.mode=subscribe&hub.verify_token=<WHATSAPP_VERIFY_TOKEN
 Пример тестового payload'а (можно отправить локально — бот ответит):
 
 ```bash
-curl -X POST http://localhost:8080/webhook/whatsapp \
+curl -X POST http://localhost:8082/webhook/whatsapp \
   -H "Content-Type: application/json" \
   -d '{
     "object": "whatsapp_business_account",
@@ -205,7 +205,7 @@ dentdesk/
 │   ├── scheduler/           интерфейс + 3 адаптера
 │   ├── llm/                 Anthropic/Groq/Mock + persona + guardrails + orchestrator
 │   ├── whatsapp/            Cloud API клиент + webhook parser
-│   ├── notifications/       24h / 2h / follow-up
+│   ├── notifications/       24h / 1h / follow-up
 │   ├── realtime/            SSE hub
 │   ├── http/                router + middleware + handlers
 │   └── platform/            config, db, redis, logger, errors

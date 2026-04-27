@@ -1,0 +1,2 @@
+ALTER TABLE appointments
+ADD COLUMN IF NOT EXISTS reminder_1h_sent_at TIMESTAMPTZ;

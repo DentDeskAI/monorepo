@@ -25,6 +25,7 @@ type Clinic struct {
 type UpdateFields struct {
 	Name            string
 	Timezone        string
+	WhatsAppPhoneID *string
 	WorkingHours    json.RawMessage
 	SlotDurationMin int
 	SchedulerType   string
@@ -60,8 +61,8 @@ func (r *Repo) Create(ctx context.Context, name, timezone, schedulerType string)
 func (r *Repo) Update(ctx context.Context, id uuid.UUID, f UpdateFields) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE clinics
-		 SET name=$1, timezone=$2, working_hours=$3, slot_duration_min=$4, scheduler_type=$5
-		 WHERE id=$6`,
-		f.Name, f.Timezone, f.WorkingHours, f.SlotDurationMin, f.SchedulerType, id)
+		 SET name=$1, timezone=$2, whatsapp_phone_id=$3, working_hours=$4, slot_duration_min=$5, scheduler_type=$6
+		 WHERE id=$7`,
+		f.Name, f.Timezone, f.WhatsAppPhoneID, f.WorkingHours, f.SlotDurationMin, f.SchedulerType, id)
 	return err
 }

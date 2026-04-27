@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -24,6 +25,7 @@ type Router struct {
 	ResourceH *handlers.ResourceHandler
 	ScheduleH *handlers.SchedulingHandler
 	WhatsApp  *handlers.WhatsAppHandler
+	MacDent   *handlers.MacDentHandler
 }
 
 func (r *Router) Build() *gin.Engine {
@@ -33,7 +35,7 @@ func (r *Router) Build() *gin.Engine {
 	app.Use(middleware.Recover(r.Log))
 	app.Use(middleware.Logging(r.Log))
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{r.Origin},
+		AllowOrigins:     splitOrigins(r.Origin),
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,
@@ -48,6 +50,7 @@ func (r *Router) Build() *gin.Engine {
 	app.POST("/api/auth/login", r.AuthH.Login)
 	app.GET("/webhook/whatsapp", r.WhatsApp.Verify)
 	app.POST("/webhook/whatsapp", r.WhatsApp.Receive)
+	app.POST("/webhook/macdent/:clinicID", r.MacDent.Receive)
 
 	// ==== Protected ====
 	authmw := middleware.AuthRequired(r.AuthSvc)
@@ -56,6 +59,11 @@ func (r *Router) Build() *gin.Engine {
 		// Auth
 		api.GET("/auth/me", r.AuthH.Me)
 		api.POST("/auth/change-password", r.AdminH.ChangePassword)
+
+		// Clinic
+		api.GET("/clinic", r.AdminH.GetClinic)
+		api.PUT("/clinic", r.AdminH.UpdateClinic)
+		api.GET("/clinic/macdent/webhook-url", r.MacDent.GetWebhookURL)
 
 		// Users
 		api.GET("/users", r.AdminH.ListUsers)
@@ -112,4 +120,15 @@ func (r *Router) Build() *gin.Engine {
 	}
 
 	return app
+}
+
+func splitOrigins(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if origin := strings.TrimSpace(part); origin != "" {
+			out = append(out, origin)
+		}
+	}
+	return out
 }

@@ -1,4 +1,4 @@
-// Package notifications — автоматические напоминания и follow-up сообщения.
+// Package notifications sends appointment reminders and follow-up messages.
 package notifications
 
 import (
@@ -23,7 +23,7 @@ type Sender struct {
 func (s *Sender) RunTick(ctx context.Context) {
 	now := time.Now()
 	s.send24h(ctx, now)
-	s.send2h(ctx, now)
+	s.send1h(ctx, now)
 	s.sendFollowup(ctx, now)
 }
 
@@ -48,22 +48,22 @@ func (s *Sender) send24h(ctx context.Context, now time.Time) {
 	}
 }
 
-func (s *Sender) send2h(ctx context.Context, now time.Time) {
-	items, err := s.Repo.DueForReminder2h(ctx, now)
+func (s *Sender) send1h(ctx context.Context, now time.Time) {
+	items, err := s.Repo.DueForReminder1h(ctx, now)
 	if err != nil {
-		s.Log.Error().Err(err).Msg("fetch 2h")
+		s.Log.Error().Err(err).Msg("fetch 1h")
 		return
 	}
 	for _, a := range items {
 		if a.PatientPhone == nil {
 			continue
 		}
-		body := format2h(a)
+		body := format1h(a)
 		if err := s.WhatsApp.SendText(ctx, *a.PatientPhone, body); err != nil {
-			s.Log.Error().Err(err).Msg("send 2h")
+			s.Log.Error().Err(err).Msg("send 1h")
 			continue
 		}
-		_ = s.Repo.MarkReminder2hSent(ctx, a.ID)
+		_ = s.Repo.MarkReminder1hSent(ctx, a.ID)
 	}
 }
 
@@ -87,19 +87,19 @@ func (s *Sender) sendFollowup(ctx context.Context, now time.Time) {
 }
 
 func format24h(a appointments.Appointment) string {
-	doc := "врача"
+	doctor := "врача"
 	if a.DoctorName != nil {
-		doc = "врача " + *a.DoctorName
+		doctor = "врача " + *a.DoctorName
 	}
 	return fmt.Sprintf(
 		"Напоминаем о вашей записи завтра в %02d:%02d к %s. Если нужно перенести — просто напишите.",
-		a.StartsAt.Hour(), a.StartsAt.Minute(), doc,
+		a.StartsAt.Hour(), a.StartsAt.Minute(), doctor,
 	)
 }
 
-func format2h(a appointments.Appointment) string {
+func format1h(a appointments.Appointment) string {
 	return fmt.Sprintf(
-		"Ждём вас сегодня в %02d:%02d 🙂 Если планы изменились — дайте знать.",
+		"Напоминаем: через час у вас запись на %02d:%02d. Если планы изменились — напишите нам в этот чат.",
 		a.StartsAt.Hour(), a.StartsAt.Minute(),
 	)
 }

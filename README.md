@@ -17,8 +17,8 @@ cp .env.example .env
 # заполнить WHATSAPP_*, ANTHROPIC_API_KEY
 docker-compose up --build
 # миграции применятся автоматически из /migrations
-# CRM: http://localhost:5173 (admin@demo.kz / demo1234)
-# API: http://localhost:8080
+# CRM: http://localhost:3000 (admin@demo.kz / demo1234)
+# API: http://localhost:8082
 ```
 
 ## Структура
@@ -40,7 +40,7 @@ docker/           — Dockerfile'ы
 3. **LLM orchestrator** — отдельный слой с guardrails, system prompt, intent/entity extraction. Сменить Claude на Groq = одна строка в `cmd/api/main.go`.
 4. **SSE вместо WebSocket** для realtime-чатов в CRM — проще, достаточно для push'а операторам.
 5. **Идемпотентность webhook'а** — дедуп по `wa_message_id` через Postgres UNIQUE + Redis SETNX.
-6. **Worker отдельный бинарь** — напоминания за 24ч и за 2ч, follow-up через 3 дня после визита.
+6. **Worker отдельный бинарь** — напоминания за 24ч и за 1ч, follow-up через 3 дня после визита.
 
 ## План запуска MVP (1–2 дня)
 
