@@ -130,6 +130,7 @@ func main() {
 	crmH := &handlers.CRMHandler{Svc: crmSvc}
 	resourceH := &handlers.ResourceHandler{Svc: resourceSvc}
 	scheduleH := &handlers.SchedulingHandler{Sched: sched, Svc: schedulingSvc}
+	dashboardH := &handlers.DashboardHandler{Sched: sched}
 	waH := &handlers.WhatsAppHandler{
 		DB:            database,
 		Redis:         redisClient,
@@ -144,15 +145,16 @@ func main() {
 	}
 
 	router := (&httpx.Router{
-		AuthSvc:   authSvc,
-		Log:       log,
-		Origin:    cfg.CRMOrigin,
-		AuthH:     authH,
-		AdminH:    adminH,
-		CRMH:      crmH,
-		ResourceH: resourceH,
-		ScheduleH: scheduleH,
-		WhatsApp:  waH,
+		AuthSvc:    authSvc,
+		Log:        log,
+		Origin:     cfg.CRMOrigin,
+		AuthH:      authH,
+		AdminH:     adminH,
+		CRMH:       crmH,
+		ResourceH:  resourceH,
+		ScheduleH:  scheduleH,
+		DashboardH: dashboardH,
+		WhatsApp:   waH,
 	}).Build()
 
 	srv := &http.Server{

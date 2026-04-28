@@ -32,7 +32,6 @@ function parseMacdentDate(s) {
   return new Date(+y, +m - 1, +d, +h, +min, +sec);
 }
 
-// MacDent integer status → local status string (3-6 = various "arrived/in-chair" states)
 const MD_STATUS = { 0: "scheduled", 1: "confirmed", 2: "cancelled" };
 
 function normalizeMacdent(a, doctorMap, patientMap) {
@@ -57,10 +56,25 @@ function fmtTime(date) {
 
 const STATUS_CARD = {
   scheduled: "bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800",
-  confirmed:  "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800",
-  completed:  "bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600",
-  cancelled:  "bg-slate-50 dark:bg-slate-700/30 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-700 opacity-60",
+  confirmed: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800",
+  completed: "bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600",
+  cancelled: "bg-slate-50 dark:bg-slate-700/30 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-700 opacity-60",
 };
+
+// Module-level cache — survives component unmount/remount (cleared only on hard refresh).
+const _refCache = { doctors: null, patients: null };
+
+function fetchDoctors() {
+  if (_refCache.doctors) return _refCache.doctors;
+  _refCache.doctors = api.doctors().catch(() => []);
+  return _refCache.doctors;
+}
+
+function fetchPatients() {
+  if (_refCache.patients) return _refCache.patients;
+  _refCache.patients = api.patients().catch(() => []);
+  return _refCache.patients;
+}
 
 function startOfWeek(d) {
   const x = new Date(d);
@@ -99,25 +113,26 @@ export default function Calendar() {
   useEffect(() => {
     setLoading(true);
     setError(null);
+
     Promise.all([
-      api.scheduleDoctors(),
-      api.doctors().catch(() => []),
-      api.patients().catch(() => []),
+      api.scheduleDoctors(weekStart.toISOString(), weekEnd.toISOString()),
+      fetchDoctors(),
+      fetchPatients(),
     ])
-      .then(([resp, docs, patients]) => {
-        const doctorMap = Object.fromEntries(docs.map((d) => [d.id, d.name]));
-        const patientMap = Object.fromEntries(patients.map((p) => [p.id, p]));
-        const normalized = (resp?.appointments ?? [])
-          .map((a) => normalizeMacdent(a, doctorMap, patientMap))
-          .filter(({ starts_at }) => starts_at >= weekStart && starts_at < weekEnd);
-        setItems(normalized);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch schedule:", err);
-        setError("Failed to load schedule");
-        setItems([]);
-      })
-      .finally(() => setLoading(false));
+        .then(([resp, docs, patients]) => {
+          const doctorMap  = Object.fromEntries(docs.map((d) => [d.id, d.name]));
+          const patientMap = Object.fromEntries(patients.map((p) => [p.id, p]));
+          const normalized = (resp?.appointments ?? [])
+              .map((a) => normalizeMacdent(a, doctorMap, patientMap))
+              .filter(({ starts_at }) => starts_at >= weekStart && starts_at < weekEnd);
+          setItems(normalized);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch schedule:", err);
+          setError("Failed to load schedule");
+          setItems([]);
+        })
+        .finally(() => setLoading(false));
   }, [weekStart, weekEnd]);
 
   const byDayHour = useMemo(() => {
@@ -129,6 +144,12 @@ export default function Calendar() {
       if (!m[key]) m[key] = [];
       m[key].push(a);
     }
+
+    // SORTING FIX: Sort appointments in each hour slot by minutes
+    Object.keys(m).forEach(key => {
+      m[key].sort((a, b) => a.starts_at.getTime() - b.starts_at.getTime());
+    });
+
     return m;
   }, [items]);
 
@@ -183,7 +204,7 @@ export default function Calendar() {
         </div>
 
         {/* CALENDAR GRID */}
-        <div className="flex-1 overflow-auto p-6 relative">
+        <div className="flex-1 overflow-auto p-4 lg:p-6 relative">
           {loading && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 z-10">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -202,10 +223,10 @@ export default function Calendar() {
               </div>
           )}
 
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden min-w-[900px]">
-            <div className="grid" style={{ gridTemplateColumns: "60px repeat(7, 1fr)" }}>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="grid" style={{ gridTemplateColumns: "50px repeat(7, minmax(120px, 1fr))" }}>
               {/* Header Row */}
-              <div className="bg-slate-50 dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 p-2" />
+              <div className="bg-slate-50 dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 p-2 sticky left-0 z-20" />
               {daysShort.map((d, i) => {
                 const date = new Date(weekStart);
                 date.setDate(date.getDate() + i);
@@ -231,18 +252,16 @@ export default function Calendar() {
               {/* Time Rows */}
               {Array.from({ length: 12 }, (_, i) => 9 + i).map((h) => (
                   <Fragment key={`row-${h}`}>
-                    {/* Time Label */}
-                    <div className="text-xs text-slate-400 font-medium text-center py-4 border-r border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
+                    <div className="text-[10px] text-slate-400 font-bold text-center py-4 border-r border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/90 sticky left-0 z-10">
                       {h}:00
                     </div>
 
-                    {/* Day Cells */}
                     {Array.from({ length: 7 }).map((_, dayIdx) => {
                       const cellItems = byDayHour[`${dayIdx}-${h}`] || [];
                       return (
                           <div
                               key={`${h}-${dayIdx}`}
-                              className="min-h-[80px] border-r border-b border-slate-100 dark:border-slate-700 p-1 space-y-1.5 hover:bg-slate-50/30 dark:hover:bg-slate-700/20 transition-colors"
+                              className="min-h-[90px] border-r border-b border-slate-100 dark:border-slate-700 p-1 space-y-1.5 hover:bg-slate-50/30 dark:hover:bg-slate-700/20 transition-colors"
                           >
                             {cellItems.map((a) => {
                               const cardCls = STATUS_CARD[a.status] ?? STATUS_CARD.scheduled;
@@ -252,28 +271,21 @@ export default function Calendar() {
                               return (
                                   <div
                                       key={a.id}
-                                      className={`text-[11px] px-2 py-1.5 rounded border shadow-sm transition-all cursor-pointer hover:shadow-md ${cardCls} ${isCancelled ? "line-through" : ""}`}
+                                      className={`text-[10px] px-1.5 py-1 rounded border shadow-sm transition-all cursor-pointer hover:shadow-md ${cardCls} ${isCancelled ? "line-through" : ""}`}
                                   >
-                                    {/* Time range + new-patient badge */}
                                     <div className="flex items-center justify-between font-bold mb-0.5 gap-1">
-                                      <span>{fmtTime(a.starts_at)}–{fmtTime(a.ends_at)}</span>
+                                      <span className="whitespace-nowrap">{fmtTime(a.starts_at)}</span>
                                       {a.patient_is_first && (
-                                        <span className="text-[9px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded px-1 font-semibold shrink-0">
-                                          new
-                                        </span>
+                                          <span className="text-[8px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded px-0.5 font-bold shrink-0">
+                                  NEW
+                                </span>
                                       )}
                                     </div>
-                                    {/* Patient */}
-                                    <div className="truncate font-semibold">
+                                    <div className="truncate font-bold leading-tight">
                                       {a.patient_name || a.patient_phone || t(i18nKeys.calendar.no_patient)}
                                     </div>
-                                    {/* Doctor + cabinet */}
                                     {secondary && (
-                                      <div className="truncate opacity-70 mt-0.5">{secondary}</div>
-                                    )}
-                                    {/* Complaint */}
-                                    {a.zhaloba && (
-                                      <div className="truncate opacity-50 italic mt-0.5">{a.zhaloba}</div>
+                                        <div className="truncate opacity-80 text-[9px] mt-0.5">{secondary}</div>
                                     )}
                                   </div>
                               );

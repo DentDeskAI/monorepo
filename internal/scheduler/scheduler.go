@@ -88,6 +88,26 @@ type AppointmentsResponse struct {
 	Appointments []Appointment `json:"appointments"`
 }
 
+type UpdateAppointmentParams struct {
+	DoctorID *int
+	Start    *time.Time
+	End      *time.Time
+	Zhaloba  *string
+	Comment  *string
+}
+
+type AppointmentRequestParams struct {
+	PatientName  string
+	PatientPhone string
+	Start        time.Time
+	End          time.Time
+	WhereKnow    string
+}
+
+type AppointmentRequestResult struct {
+	ID int `json:"id"`
+}
+
 // ── service ──────────────────────────────────────────────────────────────────
 
 // Service is DentDesk's scheduling service. It's a single concrete type — no
@@ -162,33 +182,37 @@ func (s *Service) ListPatients(ctx context.Context, clinicID uuid.UUID) ([]Patie
 	}
 	out := make([]Patient, 0, len(resp.Patients))
 	for _, p := range resp.Patients {
-		out = append(out, Patient{
-			Name:      p.Name,
-			Gender:    p.Gender,
-			ID:        p.ID,
-			IIN:       p.IIN,
-			Number:    p.Number,
-			Phone:     p.Phone,
-			Birth:     p.Birth,
-			IsChild:   p.IsChild,
-			Comment:   p.Comment,
-			WhereKnow: p.WhereKnow,
-		})
+		out = append(out, toPatient(p))
 	}
 	return out, nil
 }
 
 func (s *Service) GetPatient(ctx context.Context, clinicID uuid.UUID, id int) (*Patient, error) {
-	list, err := s.ListPatients(ctx, clinicID)
+	c, err := s.macdent(ctx, clinicID)
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range list {
-		if p.ID == id {
-			return &p, nil
-		}
+	p, err := c.GetPatientByID(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("patient %d not found", id)
+	out := toPatient(*p)
+	return &out, nil
+}
+
+func toPatient(p macdent.Patient) Patient {
+	return Patient{
+		Name:      p.Name,
+		Gender:    p.Gender,
+		ID:        p.ID,
+		IIN:       p.IIN,
+		Number:    p.Number,
+		Phone:     p.Phone,
+		Birth:     p.Birth,
+		IsChild:   p.IsChild,
+		Comment:   p.Comment,
+		WhereKnow: p.WhereKnow,
+	}
 }
 
 // ── clinic ───────────────────────────────────────────────────────────────────
@@ -207,17 +231,15 @@ func (s *Service) GetClinic(ctx context.Context, clinicID uuid.UUID) (*Stomatolo
 
 // ── appointments (zapis) ─────────────────────────────────────────────────────
 
-func (s *Service) ListAppointments(ctx context.Context, id uuid.UUID) (*AppointmentsResponse, error) {
-	c, err := s.macdent(ctx, id)
+func (s *Service) ListAppointments(ctx context.Context, clinicID uuid.UUID, from, to time.Time) (*AppointmentsResponse, error) {
+	c, err := s.macdent(ctx, clinicID)
 	if err != nil {
 		return nil, err
 	}
-
-	apps, err := c.GetAppointments(ctx)
+	apps, err := c.GetAppointments(ctx, from, to)
 	if err != nil {
 		return nil, err
 	}
-
 	out := make([]Appointment, 0, len(apps.Appointments))
 	for _, a := range apps.Appointments {
 		out = append(out, Appointment{
@@ -235,8 +257,37 @@ func (s *Service) ListAppointments(ctx context.Context, id uuid.UUID) (*Appointm
 			Rasp:    a.Rasp,
 		})
 	}
-
 	return &AppointmentsResponse{Appointments: out}, nil
+}
+
+func (s *Service) GetAppointmentByID(ctx context.Context, clinicID uuid.UUID, id int) (*macdent.ZapisDetail, error) {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	return c.GetAppointmentByID(ctx, id)
+}
+
+func (s *Service) UpdateAppointment(ctx context.Context, clinicID uuid.UUID, id int, p UpdateAppointmentParams) error {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return err
+	}
+	return c.UpdateAppointment(ctx, id, macdent.UpdateZapisParams{
+		DoctorID: p.DoctorID,
+		Start:    p.Start,
+		End:      p.End,
+		Zhaloba:  p.Zhaloba,
+		Comment:  p.Comment,
+	})
+}
+
+func (s *Service) RemoveAppointment(ctx context.Context, clinicID uuid.UUID, id int) error {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return err
+	}
+	return c.RemoveAppointment(ctx, id)
 }
 
 func (s *Service) CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error) {
@@ -252,12 +303,38 @@ func (s *Service) CreateAppointment(ctx context.Context, req BookRequest) (*Book
 	ext := fmt.Sprint(z.ID)
 	return &BookResult{AppointmentID: uuid.New(), ExternalID: &ext}, nil
 }
-//
-//func (s *Service) CancelAppointment(ctx context.Context, appointmentID uuid.UUID) error {
-//	// TODO: resolve MacDent integer zapis ID from appointmentID (external_id lookup) then call SetStatus(id, 2)
-//	_ = appointmentID
-//	return nil
-//}
+
+func (s *Service) SendAppointmentRequest(ctx context.Context, clinicID uuid.UUID, p AppointmentRequestParams) (*AppointmentRequestResult, error) {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	res, err := c.SendAppointmentRequest(ctx, macdent.AppointmentRequest{
+		PatientName:  p.PatientName,
+		PatientPhone: p.PatientPhone,
+		Start:        p.Start,
+		End:          p.End,
+		WhereKnow:    p.WhereKnow,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &AppointmentRequestResult{ID: res.ID}, nil
+}
+
+// ── rashodi ──────────────────────────────────────────────────────────────────
+
+func (s *Service) GetRashodi(ctx context.Context, clinicID uuid.UUID, from, to time.Time) ([]macdent.Rashod, error) {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.GetRashodi(ctx, from, to)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Rashodi, nil
+}
 
 // ── slots ────────────────────────────────────────────────────────────────────
 

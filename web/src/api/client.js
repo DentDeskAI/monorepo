@@ -44,7 +44,22 @@ export const api = {
   // calendar
   calendar: (from, to) =>
     request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
-  scheduleDoctors: () => request("/schedule/doctors"),
+
+  // schedule — MacDent live data
+  scheduleDoctors: (from, to) => {
+    const q = from && to
+      ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      : "";
+    return request(`/schedule/doctors${q}`);
+  },
+  scheduleAppointment: (id) => request(`/schedule/appointments/${id}`),
+  updateScheduleAppointment: (id, body) =>
+    request(`/schedule/appointments/${id}`, { method: "PUT", body }),
+  deleteScheduleAppointment: (id) =>
+    request(`/schedule/appointments/${id}`, { method: "DELETE" }),
+  schedulePatient: (id) => request(`/schedule/patients/${id}`),
+  sendAppointmentRequest: (body) =>
+    request("/schedule/appointment-requests", { method: "POST", body }),
 
   // doctors
   doctors: () => request("/doctors"),
@@ -59,6 +74,13 @@ export const api = {
 
   // stats
   stats: () => request("/stats"),
+
+  // dashboard analytics
+  dashboardToday: () => request("/dashboard/today"),
+  dashboardStats: (from, to) =>
+    request(`/dashboard/stats?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  dashboardRevenue: (from, to) =>
+    request(`/dashboard/revenue?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
 
   // SSE
   subscribe: (onEvent) => {

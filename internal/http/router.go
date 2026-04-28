@@ -15,15 +15,16 @@ import (
 )
 
 type Router struct {
-	AuthSvc   *auth.Service
-	Log       zerolog.Logger
-	Origin    string
-	AuthH     *handlers.AuthHandler
-	AdminH    *handlers.AdminHandler
-	CRMH      *handlers.CRMHandler
-	ResourceH *handlers.ResourceHandler
-	ScheduleH *handlers.SchedulingHandler
-	WhatsApp  *handlers.WhatsAppHandler
+	AuthSvc    *auth.Service
+	Log        zerolog.Logger
+	Origin     string
+	AuthH      *handlers.AuthHandler
+	AdminH     *handlers.AdminHandler
+	CRMH       *handlers.CRMHandler
+	ResourceH  *handlers.ResourceHandler
+	ScheduleH  *handlers.SchedulingHandler
+	DashboardH *handlers.DashboardHandler
+	WhatsApp   *handlers.WhatsAppHandler
 }
 
 func (r *Router) Build() *gin.Engine {
@@ -100,13 +101,25 @@ func (r *Router) Build() *gin.Engine {
 		api.PUT("/chairs/:id", r.ResourceH.UpdateChair)
 		api.DELETE("/chairs/:id", r.ResourceH.DeactivateChair)
 
-		// Scheduling
+		// Schedule — MacDent read/write (integer IDs, live data)
 		api.GET("/schedule/doctors", r.ScheduleH.ListAppointments)
+		api.GET("/schedule/appointments/:id", r.ScheduleH.GetScheduleAppointment)
+		api.PUT("/schedule/appointments/:id", r.ScheduleH.UpdateScheduleAppointment)
+		api.DELETE("/schedule/appointments/:id", r.ScheduleH.DeleteScheduleAppointment)
+		api.GET("/schedule/patients/:id", r.ScheduleH.GetSchedulePatient)
+		api.POST("/schedule/appointment-requests", r.ScheduleH.SendAppointmentRequest)
+
+		// Appointments — local DB (UUID-keyed, operator-created)
 		api.GET("/appointments/", r.ScheduleH.ListAppointments)
 		api.POST("/appointments", r.ScheduleH.CreateAppointment)
 		api.GET("/appointments/:id", r.ScheduleH.GetAppointment)
 		api.PUT("/appointments/:id/status", r.ScheduleH.UpdateAppointmentStatus)
 		api.GET("/calendar", r.CRMH.Calendar)
+
+		// Dashboard analytics
+		api.GET("/dashboard/today",   r.DashboardH.Today)
+		api.GET("/dashboard/stats",   r.DashboardH.Stats)
+		api.GET("/dashboard/revenue", r.DashboardH.Revenue)
 
 		// Realtime
 		api.GET("/events", r.CRMH.SSE)
