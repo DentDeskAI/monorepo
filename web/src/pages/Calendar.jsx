@@ -32,19 +32,35 @@ function parseMacdentDate(s) {
   return new Date(+y, +m - 1, +d, +h, +min, +sec);
 }
 
-// MacDent integer status → local status string
+// MacDent integer status → local status string (3-6 = various "arrived/in-chair" states)
 const MD_STATUS = { 0: "scheduled", 1: "confirmed", 2: "cancelled" };
 
-function normalizeMacdent(a) {
+function normalizeMacdent(a, doctorMap, patientMap) {
+  const patient = patientMap[a.patient];
   return {
     id: a.id,
     starts_at: parseMacdentDate(a.start),
-    patient_name: a.cabinet || null, // Using cabinet as location placeholder
-    patient_phone: null,
-    doctor_name: null,
+    ends_at: parseMacdentDate(a.end),
+    patient_name: patient?.name ?? null,
+    patient_phone: patient?.phone ?? null,
+    patient_is_first: a.isFirst,
+    doctor_name: doctorMap[String(a.doctor)] ?? null,
+    cabinet: a.cabinet || null,
+    zhaloba: a.zhaloba || null,
     status: MD_STATUS[a.status] ?? "completed",
   };
 }
+
+function fmtTime(date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+const STATUS_CARD = {
+  scheduled: "bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800",
+  confirmed:  "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800",
+  completed:  "bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600",
+  cancelled:  "bg-slate-50 dark:bg-slate-700/30 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-700 opacity-60",
+};
 
 function startOfWeek(d) {
   const x = new Date(d);
@@ -83,26 +99,25 @@ export default function Calendar() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    api
-        .scheduleDoctors()
-        .then((resp) => {
-          if (resp && resp.appointments) {
-            const items = resp.appointments
-                .map(normalizeMacdent)
-                .filter(({ starts_at }) => {
-                  return starts_at >= weekStart && starts_at < weekEnd;
-                });
-            setItems(items);
-          } else {
-            setItems([]);
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to fetch schedule:", err);
-          setError("Failed to load schedule");
-          setItems([]);
-        })
-        .finally(() => setLoading(false));
+    Promise.all([
+      api.scheduleDoctors(),
+      api.doctors().catch(() => []),
+      api.patients().catch(() => []),
+    ])
+      .then(([resp, docs, patients]) => {
+        const doctorMap = Object.fromEntries(docs.map((d) => [d.id, d.name]));
+        const patientMap = Object.fromEntries(patients.map((p) => [p.id, p]));
+        const normalized = (resp?.appointments ?? [])
+          .map((a) => normalizeMacdent(a, doctorMap, patientMap))
+          .filter(({ starts_at }) => starts_at >= weekStart && starts_at < weekEnd);
+        setItems(normalized);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch schedule:", err);
+        setError("Failed to load schedule");
+        setItems([]);
+      })
+      .finally(() => setLoading(false));
   }, [weekStart, weekEnd]);
 
   const byDayHour = useMemo(() => {
@@ -230,27 +245,35 @@ export default function Calendar() {
                               className="min-h-[80px] border-r border-b border-slate-100 dark:border-slate-700 p-1 space-y-1.5 hover:bg-slate-50/30 dark:hover:bg-slate-700/20 transition-colors"
                           >
                             {cellItems.map((a) => {
+                              const cardCls = STATUS_CARD[a.status] ?? STATUS_CARD.scheduled;
                               const isCancelled = a.status === "cancelled";
-                              const d = a.starts_at;
+                              const secondary = [a.doctor_name, a.cabinet].filter(Boolean).join(" · ");
 
                               return (
                                   <div
                                       key={a.id}
-                                      className={`text-[11px] px-2 py-1.5 rounded border transition-all cursor-pointer ${
-                                          isCancelled
-                                              ? "bg-slate-50 dark:bg-slate-700 text-slate-400 border-slate-100 dark:border-slate-600 line-through"
-                                              : "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-800 shadow-sm hover:shadow-md"
-                                      }`}
+                                      className={`text-[11px] px-2 py-1.5 rounded border shadow-sm transition-all cursor-pointer hover:shadow-md ${cardCls} ${isCancelled ? "line-through" : ""}`}
                                   >
-                                    <div className="font-bold mb-0.5">
-                                      {String(d.getHours()).padStart(2, "0")}:{String(d.getMinutes()).padStart(2, "0")}
-                                      {" · "}
+                                    {/* Time range + new-patient badge */}
+                                    <div className="flex items-center justify-between font-bold mb-0.5 gap-1">
+                                      <span>{fmtTime(a.starts_at)}–{fmtTime(a.ends_at)}</span>
+                                      {a.patient_is_first && (
+                                        <span className="text-[9px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded px-1 font-semibold shrink-0">
+                                          new
+                                        </span>
+                                      )}
+                                    </div>
+                                    {/* Patient */}
+                                    <div className="truncate font-semibold">
                                       {a.patient_name || a.patient_phone || t(i18nKeys.calendar.no_patient)}
                                     </div>
-                                    {a.doctor_name && (
-                                        <div className="text-slate-500 dark:text-slate-400 truncate font-medium">
-                                          {a.doctor_name}
-                                        </div>
+                                    {/* Doctor + cabinet */}
+                                    {secondary && (
+                                      <div className="truncate opacity-70 mt-0.5">{secondary}</div>
+                                    )}
+                                    {/* Complaint */}
+                                    {a.zhaloba && (
+                                      <div className="truncate opacity-50 italic mt-0.5">{a.zhaloba}</div>
                                     )}
                                   </div>
                               );
