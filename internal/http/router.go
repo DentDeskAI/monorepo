@@ -120,9 +120,12 @@ func (r *Router) Build() *gin.Engine {
 		api.GET("/calendar", r.CRMH.Calendar)
 
 		// Dashboard analytics
-		api.GET("/dashboard/today",   r.DashboardH.Today)
-		api.GET("/dashboard/stats",   r.DashboardH.Stats)
+		api.GET("/dashboard/today", r.DashboardH.Today)
+		api.GET("/dashboard/stats", r.DashboardH.Stats)
 		api.GET("/dashboard/revenue", r.DashboardH.Revenue)
+
+		// History — past + current week appointments table
+		api.GET("/history", r.ScheduleH.GetHistory)
 
 		// Realtime
 		api.GET("/events", r.CRMH.SSE)
