@@ -11,7 +11,7 @@ import (
 	"github.com/dentdesk/dentdesk/internal/scheduler"
 )
 
-// MacDent appointment status codes.
+// Scheduler appointment status codes.
 const (
 	mdStatusScheduled = 0
 	mdStatusConfirmed = 1
@@ -23,7 +23,7 @@ const (
 )
 
 type DashboardHandler struct {
-	Sched *scheduler.Service
+	Sched scheduler.Scheduler
 }
 
 // ── /api/dashboard/today ─────────────────────────────────────────────────────
@@ -50,10 +50,10 @@ type todayAppt struct {
 }
 
 type todayResponse struct {
-	Date            string        `json:"date"`
-	Total           int           `json:"total"`
-	Counts          statusCounts  `json:"counts"`
-	Upcoming        []todayAppt   `json:"upcoming"`
+	Date             string       `json:"date"`
+	Total            int          `json:"total"`
+	Counts           statusCounts `json:"counts"`
+	Upcoming         []todayAppt  `json:"upcoming"`
 	NewPatientsToday int          `json:"new_patients_today"`
 }
 
@@ -101,7 +101,7 @@ func (h *DashboardHandler) Today(c *gin.Context) {
 		}
 
 		// Upcoming = confirmed or scheduled starting after now
-		if (a.Status == mdStatusScheduled || a.Status == mdStatusConfirmed || a.Status == mdStatusLate) {
+		if a.Status == mdStatusScheduled || a.Status == mdStatusConfirmed || a.Status == mdStatusLate {
 			upcoming = append(upcoming, todayAppt{
 				ID:       a.ID,
 				Start:    a.Start,
@@ -150,17 +150,17 @@ type funnelData struct {
 }
 
 type statsResponse struct {
-	Period          periodRange            `json:"period"`
-	Total           int                    `json:"total"`
-	Completed       int                    `json:"completed"`
-	Cancelled       int                    `json:"cancelled"`
-	NoShow          int                    `json:"no_show"`
-	NewPatients     int                    `json:"new_patients"`
-	CompletionRate  float64                `json:"completion_rate"`
-	NewPatientRate  float64                `json:"new_patient_rate"`
-	Funnel          funnelData             `json:"funnel"`
-	ByDoctor        []doctorStats          `json:"by_doctor"`
-	Heatmap         map[string][]int       `json:"heatmap"`
+	Period         periodRange      `json:"period"`
+	Total          int              `json:"total"`
+	Completed      int              `json:"completed"`
+	Cancelled      int              `json:"cancelled"`
+	NoShow         int              `json:"no_show"`
+	NewPatients    int              `json:"new_patients"`
+	CompletionRate float64          `json:"completion_rate"`
+	NewPatientRate float64          `json:"new_patient_rate"`
+	Funnel         funnelData       `json:"funnel"`
+	ByDoctor       []doctorStats    `json:"by_doctor"`
+	Heatmap        map[string][]int `json:"heatmap"`
 }
 
 // Stats serves GET /api/dashboard/stats?from=&to=
@@ -278,12 +278,12 @@ type revenueTrendPoint struct {
 }
 
 type revenueResponse struct {
-	Period        periodRange         `json:"period"`
-	TotalIncome   float64             `json:"total_income"`
-	TotalExpense  float64             `json:"total_expense"`
-	Net           float64             `json:"net"`
-	ByType        []paymentTypeEntry  `json:"by_type"`
-	Trend         []revenueTrendPoint `json:"trend"`
+	Period       periodRange         `json:"period"`
+	TotalIncome  float64             `json:"total_income"`
+	TotalExpense float64             `json:"total_expense"`
+	Net          float64             `json:"net"`
+	ByType       []paymentTypeEntry  `json:"by_type"`
+	Trend        []revenueTrendPoint `json:"trend"`
 }
 
 // Revenue serves GET /api/dashboard/revenue?from=&to=
@@ -291,7 +291,7 @@ func (h *DashboardHandler) Revenue(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	from, to := dashboardRange(c.Query("from"), c.Query("to"))
 
-	rashodi, err := h.Sched.GetRashodi(c.Request.Context(), cl.ClinicID, from, to)
+	revenue, err := h.Sched.GetRevenue(c.Request.Context(), cl.ClinicID, from, to)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -301,9 +301,8 @@ func (h *DashboardHandler) Revenue(c *gin.Context) {
 	trendMap := map[string]*revenueTrendPoint{}
 	var totalIncome, totalExpense float64
 
-	for _, r := range rashodi {
-		summ := r.SummFloat()
-		typeName := r.TypeOplata
+	for _, r := range revenue {
+		typeName := r.PaymentType
 		if typeName == "" {
 			typeName = "Other"
 		}
@@ -311,14 +310,14 @@ func (h *DashboardHandler) Revenue(c *gin.Context) {
 		date := rashodDate(r.Date)
 
 		if r.Type == 1 { // income
-			totalIncome += summ
-			byType[typeName] += summ
+			totalIncome += r.Amount
+			byType[typeName] += r.Amount
 			pt := trendPointFor(trendMap, date)
-			pt.Income += summ
+			pt.Income += r.Amount
 		} else if r.Type == 2 { // expense
-			totalExpense += summ
+			totalExpense += r.Amount
 			pt := trendPointFor(trendMap, date)
-			pt.Expense += summ
+			pt.Expense += r.Amount
 		}
 	}
 
@@ -405,4 +404,3 @@ func trendPointFor(m map[string]*revenueTrendPoint, date string) *revenueTrendPo
 func round2(v float64) float64 {
 	return float64(int(v*100+0.5)) / 100
 }
-

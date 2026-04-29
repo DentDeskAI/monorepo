@@ -14,6 +14,7 @@ type Doctor struct {
 	Name       string    `db:"name" json:"name"`
 	Specialty  *string   `db:"specialty" json:"specialty,omitempty"`
 	Active     bool      `db:"active" json:"active"`
+	SeqID      int       `db:"seq_id" json:"seq_id"`
 }
 
 type Repo struct{ db *sqlx.DB }
@@ -23,7 +24,7 @@ func NewRepo(db *sqlx.DB) *Repo { return &Repo{db: db} }
 func (r *Repo) List(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
 	var out []Doctor
 	err := r.db.SelectContext(ctx, &out,
-		`SELECT id, clinic_id, external_id, name, specialty, active
+		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id
 		 FROM doctors WHERE clinic_id=$1 AND active=TRUE ORDER BY name`, clinicID)
 	return out, err
 }
@@ -31,7 +32,7 @@ func (r *Repo) List(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
 func (r *Repo) FindBySpecialty(ctx context.Context, clinicID uuid.UUID, specialty string) ([]Doctor, error) {
 	var out []Doctor
 	err := r.db.SelectContext(ctx, &out,
-		`SELECT id, clinic_id, external_id, name, specialty, active
+		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id
 		 FROM doctors WHERE clinic_id=$1 AND active=TRUE AND specialty=$2`,
 		clinicID, specialty)
 	return out, err
@@ -40,7 +41,7 @@ func (r *Repo) FindBySpecialty(ctx context.Context, clinicID uuid.UUID, specialt
 func (r *Repo) GetByExternalID(ctx context.Context, clinicID uuid.UUID, externalID string) (*Doctor, error) {
 	var d Doctor
 	err := r.db.GetContext(ctx, &d,
-		`SELECT id, clinic_id, external_id, name, specialty, active
+		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id
 		 FROM doctors WHERE clinic_id=$1 AND external_id=$2`, clinicID, externalID)
 	if err != nil {
 		return nil, err
@@ -51,7 +52,18 @@ func (r *Repo) GetByExternalID(ctx context.Context, clinicID uuid.UUID, external
 func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Doctor, error) {
 	var d Doctor
 	err := r.db.GetContext(ctx, &d,
-		`SELECT id, clinic_id, external_id, name, specialty, active FROM doctors WHERE id=$1`, id)
+		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id FROM doctors WHERE id=$1`, id)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (r *Repo) GetBySeqID(ctx context.Context, clinicID uuid.UUID, seqID int) (*Doctor, error) {
+	var d Doctor
+	err := r.db.GetContext(ctx, &d,
+		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id
+		 FROM doctors WHERE clinic_id=$1 AND seq_id=$2 AND active=TRUE`, clinicID, seqID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +86,7 @@ func (r *Repo) Create(ctx context.Context, clinicID uuid.UUID, name string, spec
 	err := r.db.GetContext(ctx, &d,
 		`INSERT INTO doctors (clinic_id, name, specialty, external_id)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, clinic_id, external_id, name, specialty, active`,
+		 RETURNING id, clinic_id, external_id, name, specialty, active, seq_id`,
 		clinicID, name, specialty, externalID)
 	return &d, err
 }

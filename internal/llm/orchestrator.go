@@ -39,11 +39,11 @@ type Extracted struct {
 // Orchestrator связывает LLM с расписанием и диалогом.
 type Orchestrator struct {
 	llm   Client
-	sched *scheduler.Service
+	sched scheduler.Scheduler
 	log   zerolog.Logger
 }
 
-func NewOrchestrator(llm Client, sched *scheduler.Service, log zerolog.Logger) *Orchestrator {
+func NewOrchestrator(llm Client, sched scheduler.Scheduler, log zerolog.Logger) *Orchestrator {
 	return &Orchestrator{llm: llm, sched: sched, log: log}
 }
 

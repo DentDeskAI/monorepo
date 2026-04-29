@@ -72,7 +72,7 @@ export default function Patients() {
         }
 
         setLoadingDetails(true);
-        api.patient(selected.id)
+        api.patientAppointments(selected.id)
             .then((data) => {
                 setAppts(Array.isArray(data) ? data : []);
             })

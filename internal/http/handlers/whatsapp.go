@@ -28,7 +28,7 @@ type WhatsAppHandler struct {
 	Patients      *patients.Repo
 	Conversations *conversations.Repo
 	Orchestrator  *llm.Orchestrator
-	Scheduler     *scheduler.Service
+	Scheduler     scheduler.Scheduler
 	Hub           *realtime.Hub
 }
 
