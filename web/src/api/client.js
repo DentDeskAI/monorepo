@@ -45,6 +45,10 @@ export const api = {
   calendar: (from, to) =>
     request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
 
+  // history = record table
+  history: (from, to) =>
+      request(`/history?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+
   // schedule — MacDent live data
   scheduleDoctors: (from, to) => {
     const q = from && to

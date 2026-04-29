@@ -104,7 +104,8 @@
         "chats": "Чаты",
         "calendar": "Календарь",
         "patients": "Пациенты",
-        "doctors": "Докторы"
+        "doctors": "Докторы",
+        "records": "Записи"
       }
     },
     "forms": {
@@ -295,7 +296,8 @@
         "chats": "Chats",
         "calendar": "Calendar",
         "patients": "Patients",
-        "doctors": "Doctors"
+        "doctors": "Doctors",
+        "records": "Records"
       }
     },
     "forms": {
@@ -486,7 +488,8 @@
         "chats": "Чаттар",
         "calendar": "Күнтізбе",
         "patients": "Науқастар",
-        "doctors": "Дәрігерлер"
+        "doctors": "Дәрігерлер",
+        "records": "Жазбалар"
       }
     },
     "forms": {

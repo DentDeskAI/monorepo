@@ -213,6 +213,19 @@ func (h *SchedulingHandler) ListAppointments(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// GetHistory serves GET /api/history
+// Returns appointments for the given from/to range; defaults to the current Mon-Sun week.
+func (h *SchedulingHandler) GetHistory(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	from, to := weekRange(c.Query("from"), c.Query("to"))
+	resp, err := h.Sched.GetHistory(c.Request.Context(), cl.ClinicID, from, to)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 // GetScheduleAppointment serves GET /api/schedule/appointments/:id
 // Returns a rich ZapisDetail with embedded doctor and patient objects from MacDent.
 func (h *SchedulingHandler) GetScheduleAppointment(c *gin.Context) {

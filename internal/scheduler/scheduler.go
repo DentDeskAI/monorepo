@@ -454,3 +454,26 @@ func (s *Service) GetFreeSlots(
 	}
 	return slots, nil
 }
+
+type HistoryRecord struct {
+	Date          time.Time
+	Birthday      *time.Time
+	Amount        float64
+	PatientName   string
+	PhoneNumber   string
+	ServiceType   string
+	PaymentMethod string
+	DoctorName    string
+}
+
+type HistoryResponse struct {
+	Records []HistoryRecord
+}
+
+// GetHistory returns the historical appointments for a clinic over a date range.
+// For now this is the same dataset as ListAppointments (live MacDent zapis/find
+// already includes completed and cancelled records). When payment data is
+// integrated, enrich the records here.
+func (s *Service) GetHistory(ctx context.Context, clinicID uuid.UUID, from, to time.Time) (*AppointmentsResponse, error) {
+	return s.ListAppointments(ctx, clinicID, from, to)
+}
