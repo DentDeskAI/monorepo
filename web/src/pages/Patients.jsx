@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../api/client";
 import { useTranslation } from "../hooks/useTranslation";
+import Modal, { FormField, inputCls, btnPrimary, btnSecondary } from "../components/Modal";
 
 // i18n Keys
 const i18nKeys = {
@@ -41,6 +42,7 @@ export default function Patients() {
 
     const [loadingList, setLoadingList] = useState(false);
     const [loadingDetails, setLoadingDetails] = useState(false);
+    const [showCreate, setShowCreate] = useState(false);
 
     useEffect(() => {
         setLoadingList(true);
@@ -70,7 +72,7 @@ export default function Patients() {
         }
 
         setLoadingDetails(true);
-        api.patient(selected.id)
+        api.patientAppointments(selected.id)
             .then((data) => {
                 setAppts(Array.isArray(data) ? data : []);
             })
@@ -109,9 +111,17 @@ export default function Patients() {
                 {/* LEFT SIDEBAR: LIST */}
                 <div className="w-80 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
                     <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-                        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
-                            {t(i18nKeys.patients.title)}
-                        </h2>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {t(i18nKeys.patients.title)}
+                            </h2>
+                            <button
+                                onClick={() => setShowCreate(true)}
+                                className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                            >
+                                + {t("forms.new_patient")}
+                            </button>
+                        </div>
                         <input
                             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                             placeholder={t(i18nKeys.patients.search)}
@@ -252,7 +262,130 @@ export default function Patients() {
                     )}
                 </div>
             </div>
+
+            <NewPatientModal
+                open={showCreate}
+                onClose={() => setShowCreate(false)}
+                onCreated={(p) => {
+                    setList((prev) => [{
+                        id: p.id,
+                        name: p.name ?? "",
+                        phone: p.phone ?? "",
+                        number: p.number ?? "",
+                        gender: p.gender ?? null,
+                        birth: p.birth ?? null,
+                        isChild: p.isChild ?? false,
+                        comment: p.comment ?? "",
+                        whereKnow: p.whereKnow ?? "",
+                    }, ...prev]);
+                    setSelected({
+                        id: p.id,
+                        name: p.name ?? "",
+                        phone: p.phone ?? "",
+                        number: p.number ?? "",
+                        gender: p.gender ?? null,
+                        birth: p.birth ?? null,
+                        isChild: p.isChild ?? false,
+                        comment: p.comment ?? "",
+                        whereKnow: p.whereKnow ?? "",
+                    });
+                    setShowCreate(false);
+                }}
+                t={t}
+            />
         </div>
+    );
+}
+
+function NewPatientModal({ open, onClose, onCreated, t }) {
+    const [form, setForm] = useState({
+        name: "", phone: "", iin: "", birth: "",
+        gender: "", comment: "", where_know: "", is_child: false,
+    });
+    const [saving, setSaving] = useState(false);
+    const [err, setErr] = useState(null);
+
+    useEffect(() => {
+        if (open) {
+            setForm({ name: "", phone: "", iin: "", birth: "", gender: "", comment: "", where_know: "", is_child: false });
+            setErr(null);
+        }
+    }, [open]);
+
+    const set = (k) => (e) => setForm({ ...form, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
+
+    const submit = async () => {
+        if (!form.name.trim()) {
+            setErr(t("forms.name") + " ?");
+            return;
+        }
+        setSaving(true);
+        setErr(null);
+        try {
+            const created = await api.createSchedulePatient(form);
+            onCreated(created);
+        } catch (e) {
+            setErr(e.message || t("forms.action_failed"));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Modal
+            open={open}
+            onClose={onClose}
+            title={t("forms.new_patient")}
+            footer={
+                <>
+                    <button onClick={onClose} className={btnSecondary} disabled={saving}>
+                        {t("forms.cancel")}
+                    </button>
+                    <button onClick={submit} disabled={saving} className={btnPrimary}>
+                        {saving ? t("forms.saving") : t("forms.save")}
+                    </button>
+                </>
+            }
+        >
+            {err && (
+                <div className="mb-3 px-3 py-2 text-xs text-red-600 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-lg">
+                    {err}
+                </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+                <FormField label={t("forms.name") + " *"} full>
+                    <input className={inputCls} value={form.name} onChange={set("name")} autoFocus />
+                </FormField>
+                <FormField label={t("forms.phone")}>
+                    <input className={inputCls} value={form.phone} onChange={set("phone")} placeholder="+77..." />
+                </FormField>
+                <FormField label={t("forms.iin")}>
+                    <input className={inputCls} value={form.iin} onChange={set("iin")} />
+                </FormField>
+                <FormField label={t("forms.birth")}>
+                    <input className={inputCls} value={form.birth} onChange={set("birth")} placeholder="01.01.1990" />
+                </FormField>
+                <FormField label={t("forms.gender")}>
+                    <select className={inputCls} value={form.gender} onChange={set("gender")}>
+                        <option value="">—</option>
+                        <option value="M">{t("forms.male")}</option>
+                        <option value="F">{t("forms.female")}</option>
+                    </select>
+                </FormField>
+                <FormField label={t("forms.where_know")} full>
+                    <input className={inputCls} value={form.where_know} onChange={set("where_know")} />
+                </FormField>
+                <FormField label={t("forms.comment")} full>
+                    <textarea className={inputCls} rows={2} value={form.comment} onChange={set("comment")} />
+                </FormField>
+                <FormField label={t("forms.is_child")}>
+                    <label className="flex items-center gap-2 mt-1.5">
+                        <input type="checkbox" checked={form.is_child} onChange={set("is_child")} className="w-4 h-4 accent-blue-600" />
+                        <span className="text-xs text-slate-600 dark:text-slate-300">{t("common.yes")}</span>
+                    </label>
+                </FormField>
+            </div>
+        </Modal>
     );
 }
 

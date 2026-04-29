@@ -15,10 +15,10 @@ import (
 )
 
 // SchedulingHandler exposes scheduling endpoints. Pure read endpoints call the
-// scheduler.Service directly (no business logic to add). Endpoints with
+// Scheduler directly (no business logic to add). Endpoints with
 // validation or DB writes go through the SchedulingService.
 type SchedulingHandler struct {
-	Sched *scheduler.Service
+	Sched scheduler.Scheduler
 	Svc   *services.SchedulingService
 }
 
@@ -200,12 +200,274 @@ func (h *SchedulingHandler) CloseConversation(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// ListAppointments serves GET /api/schedule/doctors and GET /api/appointments/
+// It accepts optional from/to RFC3339 query params; defaults to the current Mon–Sun week.
 func (h *SchedulingHandler) ListAppointments(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
-	docs, err := h.Sched.ListAppointments(c.Request.Context(), cl.ClinicID)
+	from, to := weekRange(c.Query("from"), c.Query("to"))
+	resp, err := h.Sched.ListAppointments(c.Request.Context(), cl.ClinicID, from, to)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, docs)
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetHistory serves GET /api/history
+// Returns appointments for the given from/to range; defaults to the current Mon-Sun week.
+func (h *SchedulingHandler) GetHistory(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	from, to := weekRange(c.Query("from"), c.Query("to"))
+	resp, err := h.Sched.GetHistory(c.Request.Context(), cl.ClinicID, from, to)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetScheduleAppointment serves GET /api/schedule/appointments/:id.
+// Returns a rich appointment with embedded doctor and patient objects.
+func (h *SchedulingHandler) GetScheduleAppointment(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+		return
+	}
+	detail, err := h.Sched.GetAppointmentByID(c.Request.Context(), cl.ClinicID, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, detail)
+}
+
+type updateScheduleAppointmentReq struct {
+	DoctorID *int       `json:"doctor_id"`
+	StartsAt *time.Time `json:"starts_at"`
+	EndsAt   *time.Time `json:"ends_at"`
+	Zhaloba  *string    `json:"zhaloba"`
+	Comment  *string    `json:"comment"`
+}
+
+// UpdateScheduleAppointment serves PUT /api/schedule/appointments/:id
+func (h *SchedulingHandler) UpdateScheduleAppointment(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+		return
+	}
+	var req updateScheduleAppointmentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	err = h.Sched.UpdateAppointment(c.Request.Context(), cl.ClinicID, id, scheduler.UpdateAppointmentParams{
+		DoctorID: req.DoctorID,
+		Start:    req.StartsAt,
+		End:      req.EndsAt,
+		Zhaloba:  req.Zhaloba,
+		Comment:  req.Comment,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// DeleteScheduleAppointment serves DELETE /api/schedule/appointments/:id
+func (h *SchedulingHandler) DeleteScheduleAppointment(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+		return
+	}
+	if err := h.Sched.RemoveAppointment(c.Request.Context(), cl.ClinicID, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// GetSchedulePatient serves GET /api/schedule/patients/:id
+// Fetches a single patient directly from MacDent by integer ID.
+func (h *SchedulingHandler) GetSchedulePatient(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+		return
+	}
+	p, err := h.Sched.GetPatient(c.Request.Context(), cl.ClinicID, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, p)
+}
+
+type sendAppointmentRequestReq struct {
+	PatientName  string    `json:"patient_name"  binding:"required"`
+	PatientPhone string    `json:"patient_phone" binding:"required"`
+	StartsAt     time.Time `json:"starts_at"     binding:"required"`
+	EndsAt       time.Time `json:"ends_at"       binding:"required"`
+	WhereKnow    string    `json:"where_know"`
+}
+
+// SendAppointmentRequest serves POST /api/schedule/appointment-requests
+// Creates a заявка in MacDent — does not require an existing patient record.
+func (h *SchedulingHandler) SendAppointmentRequest(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	var req sendAppointmentRequestReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	if !req.EndsAt.After(req.StartsAt) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ends_at must be after starts_at"})
+		return
+	}
+	res, err := h.Sched.SendAppointmentRequest(c.Request.Context(), cl.ClinicID, scheduler.AppointmentRequestParams{
+		PatientName:  req.PatientName,
+		PatientPhone: req.PatientPhone,
+		Start:        req.StartsAt,
+		End:          req.EndsAt,
+		WhereKnow:    req.WhereKnow,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, res)
+}
+
+// ── creation endpoints ───────────────────────────────────────────────────────
+
+type createSchedulePatientReq struct {
+	Name      string `json:"name" binding:"required"`
+	Phone     string `json:"phone"`
+	IIN       string `json:"iin"`
+	Birth     string `json:"birth"`
+	Gender    string `json:"gender"`
+	Comment   string `json:"comment"`
+	WhereKnow string `json:"where_know"`
+	IsChild   bool   `json:"is_child"`
+}
+
+// CreateSchedulePatient serves POST /api/schedule/patients
+// Creates a patient directly in MacDent via patient/add.
+func (h *SchedulingHandler) CreateSchedulePatient(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	var req createSchedulePatientReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	p, err := h.Sched.CreatePatient(c.Request.Context(), cl.ClinicID, scheduler.CreatePatientParams{
+		Name:      req.Name,
+		Phone:     req.Phone,
+		IIN:       req.IIN,
+		Birth:     req.Birth,
+		Gender:    req.Gender,
+		Comment:   req.Comment,
+		WhereKnow: req.WhereKnow,
+		IsChild:   req.IsChild,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, p)
+}
+
+type createScheduleAppointmentReq struct {
+	DoctorID  int       `json:"doctor_id"  binding:"required"`
+	PatientID int       `json:"patient_id" binding:"required"`
+	StartsAt  time.Time `json:"starts_at"  binding:"required"`
+	EndsAt    time.Time `json:"ends_at"    binding:"required"`
+	Zhaloba   string    `json:"zhaloba"`
+	Cabinet   string    `json:"cabinet"`
+	IsFirst   bool      `json:"is_first"`
+}
+
+// CreateScheduleAppointment serves POST /api/schedule/appointments.
+func (h *SchedulingHandler) CreateScheduleAppointment(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	var req createScheduleAppointmentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	if !req.EndsAt.After(req.StartsAt) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ends_at must be after starts_at"})
+		return
+	}
+	out, err := h.Sched.CreateScheduleAppointment(c.Request.Context(), cl.ClinicID, scheduler.ScheduleAppointmentParams{
+		DoctorID:  req.DoctorID,
+		PatientID: req.PatientID,
+		Start:     req.StartsAt,
+		End:       req.EndsAt,
+		Zhaloba:   req.Zhaloba,
+		Cabinet:   req.Cabinet,
+		IsFirst:   req.IsFirst,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, out)
+}
+
+type setAppointmentStatusReq struct {
+	Status int `json:"status"`
+}
+
+// SetScheduleAppointmentStatus serves PUT /api/schedule/appointments/:id/status
+// Status codes: 0=default, 1=confirm, 2=decline, 3=came, 4=left, 5=in_process, 6=late
+func (h *SchedulingHandler) SetScheduleAppointmentStatus(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+		return
+	}
+	var req setAppointmentStatusReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	if req.Status < 0 || req.Status > 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "status must be 0..6"})
+		return
+	}
+	if err := h.Sched.SetAppointmentStatus(c.Request.Context(), cl.ClinicID, id, req.Status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// weekRange parses RFC3339/RFC3339Nano from/to strings; falls back to the current Mon–Sun week.
+func weekRange(fromStr, toStr string) (time.Time, time.Time) {
+	from, err1 := parseFlexTime(fromStr)
+	to, err2 := parseFlexTime(toStr)
+	if err1 == nil && err2 == nil {
+		return from, to
+	}
+	now := time.Now()
+	dayOffset := int(now.Weekday()+6) % 7 // Mon=0
+	monday := time.Date(now.Year(), now.Month(), now.Day()-dayOffset, 0, 0, 0, 0, now.Location())
+	return monday, monday.AddDate(0, 0, 7)
+}
+
+func parseFlexTime(s string) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, s)
 }

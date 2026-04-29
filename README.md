@@ -36,7 +36,7 @@ docker/           — Dockerfile'ы
 ## Ключевые решения
 
 1. **Модульный монолит** на Go — быстрее для MVP, чистые швы под распил.
-2. **Scheduler интерфейс** с 3 имплементациями (`local`, `mock`, `macdent`) — можно продавать клиникам без MacDent.
+2. **Scheduler registry** с backend'ами `local`/`mock`/`macdent` — можно продавать клиникам без MacDent, а MacDent DTO не протекают в HTTP-слой.
 3. **LLM orchestrator** — отдельный слой с guardrails, system prompt, intent/entity extraction. Сменить Claude на Groq = одна строка в `cmd/api/main.go`.
 4. **SSE вместо WebSocket** для realtime-чатов в CRM — проще, достаточно для push'а операторам.
 5. **Идемпотентность webhook'а** — дедуп по `wa_message_id` через Postgres UNIQUE + Redis SETNX.
