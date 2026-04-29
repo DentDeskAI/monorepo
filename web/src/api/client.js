@@ -78,6 +78,7 @@ export const api = {
   // patients
   patients: () => request("/patients"),
   patient: (id) => request(`/patients/${id}`),
+  patientAppointments: (id) => request(`/patients/${id}/appointments`),
 
   // clinic
   clinic: () => request("/clinic"),

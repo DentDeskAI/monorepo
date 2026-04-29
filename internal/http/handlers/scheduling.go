@@ -15,10 +15,10 @@ import (
 )
 
 // SchedulingHandler exposes scheduling endpoints. Pure read endpoints call the
-// scheduler.Service directly (no business logic to add). Endpoints with
+// Scheduler directly (no business logic to add). Endpoints with
 // validation or DB writes go through the SchedulingService.
 type SchedulingHandler struct {
-	Sched *scheduler.Service
+	Sched scheduler.Scheduler
 	Svc   *services.SchedulingService
 }
 
@@ -226,8 +226,8 @@ func (h *SchedulingHandler) GetHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetScheduleAppointment serves GET /api/schedule/appointments/:id
-// Returns a rich ZapisDetail with embedded doctor and patient objects from MacDent.
+// GetScheduleAppointment serves GET /api/schedule/appointments/:id.
+// Returns a rich appointment with embedded doctor and patient objects.
 func (h *SchedulingHandler) GetScheduleAppointment(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	id, err := strconv.Atoi(c.Param("id"))
@@ -394,8 +394,7 @@ type createScheduleAppointmentReq struct {
 	IsFirst   bool      `json:"is_first"`
 }
 
-// CreateScheduleAppointment serves POST /api/schedule/appointments
-// Creates a real appointment in MacDent via zapis/add.
+// CreateScheduleAppointment serves POST /api/schedule/appointments.
 func (h *SchedulingHandler) CreateScheduleAppointment(c *gin.Context) {
 	cl := middleware.ClaimsFrom(c)
 	var req createScheduleAppointmentReq
@@ -407,7 +406,7 @@ func (h *SchedulingHandler) CreateScheduleAppointment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ends_at must be after starts_at"})
 		return
 	}
-	out, err := h.Sched.CreateMacdentAppointment(c.Request.Context(), cl.ClinicID, scheduler.CreateMacdentAppointmentParams{
+	out, err := h.Sched.CreateScheduleAppointment(c.Request.Context(), cl.ClinicID, scheduler.ScheduleAppointmentParams{
 		DoctorID:  req.DoctorID,
 		PatientID: req.PatientID,
 		Start:     req.StartsAt,

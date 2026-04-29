@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -11,8 +12,14 @@ import (
 	errs "github.com/dentdesk/dentdesk/internal/platform/errors"
 )
 
+// AuthService defines the interface for auth operations
+type AuthService interface {
+	Login(ctx context.Context, email, password string) (string, *auth.User, error)
+	Parse(token string) (*auth.Claims, error)
+}
+
 type AuthHandler struct {
-	Svc *auth.Service
+	Svc AuthService
 }
 
 type loginReq struct {

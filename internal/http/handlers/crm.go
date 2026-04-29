@@ -3,17 +3,20 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/dentdesk/dentdesk/internal/http/middleware"
+	"github.com/dentdesk/dentdesk/internal/patients"
 	"github.com/dentdesk/dentdesk/internal/services"
 )
 
 type CRMHandler struct {
-	Svc *services.CRMService
+	Svc      *services.CRMService
+	Patients *patients.Repo
 }
 
 func (h *CRMHandler) ListChats(c *gin.Context) {
@@ -88,11 +91,25 @@ func (h *CRMHandler) ListPatients(c *gin.Context) {
 }
 
 func (h *CRMHandler) PatientAppointments(c *gin.Context) {
-	pid, err := uuid.Parse(c.Param("id"))
+	cl := middleware.ClaimsFrom(c)
+	idStr := c.Param("id")
+
+	// Try UUID first (internal callers), then integer seq_id (local/mock clinics).
+	pid, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
-		return
+		seqID, atoiErr := strconv.Atoi(idStr)
+		if atoiErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+			return
+		}
+		p, lookupErr := h.Patients.GetBySeqID(c.Request.Context(), cl.ClinicID, seqID)
+		if lookupErr != nil {
+			c.JSON(http.StatusOK, []interface{}{})
+			return
+		}
+		pid = p.ID
 	}
+
 	out, err := h.Svc.PatientAppointments(c.Request.Context(), pid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
