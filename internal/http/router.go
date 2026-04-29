@@ -107,6 +107,9 @@ func (r *Router) Build() *gin.Engine {
 		api.PUT("/schedule/appointments/:id", r.ScheduleH.UpdateScheduleAppointment)
 		api.DELETE("/schedule/appointments/:id", r.ScheduleH.DeleteScheduleAppointment)
 		api.GET("/schedule/patients/:id", r.ScheduleH.GetSchedulePatient)
+		api.POST("/schedule/patients", r.ScheduleH.CreateSchedulePatient)
+		api.POST("/schedule/appointments", r.ScheduleH.CreateScheduleAppointment)
+		api.PUT("/schedule/appointments/:id/status", r.ScheduleH.SetScheduleAppointmentStatus)
 		api.POST("/schedule/appointment-requests", r.ScheduleH.SendAppointmentRequest)
 
 		// Appointments — local DB (UUID-keyed, operator-created)

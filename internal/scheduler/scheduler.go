@@ -295,13 +295,94 @@ func (s *Service) CreateAppointment(ctx context.Context, req BookRequest) (*Book
 	if err != nil {
 		return nil, err
 	}
-	// TODO: resolve MacDent integer doctor ID from req.DoctorID (UUID → external_id lookup)
-	z, err := c.AddZapis(ctx, 0, req.StartsAt, req.EndsAt, req.Service)
+	// TODO: resolve MacDent integer doctor/patient IDs from req.DoctorID/req.PatientID (UUID → external_id lookup)
+	z, err := c.AddZapis(ctx, macdent.AddZapisParams{
+		Start:   req.StartsAt,
+		End:     req.EndsAt,
+		Zhaloba: req.Service,
+	})
 	if err != nil {
 		return nil, err
 	}
 	ext := fmt.Sprint(z.ID)
 	return &BookResult{AppointmentID: uuid.New(), ExternalID: &ext}, nil
+}
+
+// ── direct MacDent creation (integer IDs) ────────────────────────────────────
+
+type CreatePatientParams struct {
+	Name      string
+	Phone     string
+	IIN       string
+	Birth     string
+	Gender    string
+	Comment   string
+	WhereKnow string
+	IsChild   bool
+}
+
+func (s *Service) CreatePatient(ctx context.Context, clinicID uuid.UUID, p CreatePatientParams) (*Patient, error) {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	mp, err := c.AddPatient(ctx, macdent.AddPatientParams{
+		Name:      p.Name,
+		Phone:     p.Phone,
+		IIN:       p.IIN,
+		Birth:     p.Birth,
+		Gender:    p.Gender,
+		Comment:   p.Comment,
+		WhereKnow: p.WhereKnow,
+		IsChild:   p.IsChild,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := toPatient(*mp)
+	return &out, nil
+}
+
+type CreateMacdentAppointmentParams struct {
+	DoctorID  int
+	PatientID int
+	Start     time.Time
+	End       time.Time
+	Zhaloba   string
+	Cabinet   string
+	IsFirst   bool
+}
+
+type CreateMacdentAppointmentResult struct {
+	ID int `json:"id"`
+}
+
+func (s *Service) CreateMacdentAppointment(ctx context.Context, clinicID uuid.UUID, p CreateMacdentAppointmentParams) (*CreateMacdentAppointmentResult, error) {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	z, err := c.AddZapis(ctx, macdent.AddZapisParams{
+		DoctorID:  p.DoctorID,
+		PatientID: p.PatientID,
+		Start:     p.Start,
+		End:       p.End,
+		Zhaloba:   p.Zhaloba,
+		Cabinet:   p.Cabinet,
+		IsFirst:   p.IsFirst,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &CreateMacdentAppointmentResult{ID: z.ID}, nil
+}
+
+func (s *Service) SetAppointmentStatus(ctx context.Context, clinicID uuid.UUID, id, status int) error {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return err
+	}
+	return c.SetStatus(ctx, id, status)
 }
 
 func (s *Service) SendAppointmentRequest(ctx context.Context, clinicID uuid.UUID, p AppointmentRequestParams) (*AppointmentRequestResult, error) {

@@ -60,6 +60,12 @@ export const api = {
   schedulePatient: (id) => request(`/schedule/patients/${id}`),
   sendAppointmentRequest: (body) =>
     request("/schedule/appointment-requests", { method: "POST", body }),
+  createSchedulePatient: (body) =>
+    request("/schedule/patients", { method: "POST", body }),
+  createScheduleAppointment: (body) =>
+    request("/schedule/appointments", { method: "POST", body }),
+  setScheduleAppointmentStatus: (id, status) =>
+    request(`/schedule/appointments/${id}/status`, { method: "PUT", body: { status } }),
 
   // doctors
   doctors: () => request("/doctors"),
