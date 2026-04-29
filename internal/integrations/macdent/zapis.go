@@ -12,14 +12,34 @@ type Zapis struct {
 	ID int `json:"id"`
 }
 
+// AddZapisParams holds the inputs for zapis/add.
+type AddZapisParams struct {
+	DoctorID  int
+	PatientID int
+	Start     time.Time
+	End       time.Time
+	Zhaloba   string
+	Cabinet   string
+	IsFirst   bool
+}
+
 // AddZapis creates a new patient appointment (zapis/add).
-// doctorID is the MacDent integer doctor ID (stored as external_id in the local doctors table).
-func (c *Client) AddZapis(ctx context.Context, doctorID int, startsAt, endsAt time.Time, complaint string) (*Zapis, error) {
+// DoctorID and PatientID are MacDent integer IDs.
+func (c *Client) AddZapis(ctx context.Context, p AddZapisParams) (*Zapis, error) {
 	params := url.Values{
-		"doctor":   {fmt.Sprint(doctorID)},
-		"start":    {startsAt.Format(DateLayout)},
-		"end":      {endsAt.Format(DateLayout)},
-		"zhaloba":  {complaint},
+		"doctor":  {fmt.Sprint(p.DoctorID)},
+		"patient": {fmt.Sprint(p.PatientID)},
+		"start":   {p.Start.Format(DateLayout)},
+		"end":     {p.End.Format(DateLayout)},
+	}
+	if p.Zhaloba != "" {
+		params.Set("zhaloba", p.Zhaloba)
+	}
+	if p.Cabinet != "" {
+		params.Set("cabinet", p.Cabinet)
+	}
+	if p.IsFirst {
+		params.Set("isFirst", "1")
 	}
 	b, err := c.Get(ctx, "/zapis/add", params)
 	if err != nil {

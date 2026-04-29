@@ -332,6 +332,113 @@ func (h *SchedulingHandler) SendAppointmentRequest(c *gin.Context) {
 	c.JSON(http.StatusCreated, res)
 }
 
+// ── creation endpoints ───────────────────────────────────────────────────────
+
+type createSchedulePatientReq struct {
+	Name      string `json:"name" binding:"required"`
+	Phone     string `json:"phone"`
+	IIN       string `json:"iin"`
+	Birth     string `json:"birth"`
+	Gender    string `json:"gender"`
+	Comment   string `json:"comment"`
+	WhereKnow string `json:"where_know"`
+	IsChild   bool   `json:"is_child"`
+}
+
+// CreateSchedulePatient serves POST /api/schedule/patients
+// Creates a patient directly in MacDent via patient/add.
+func (h *SchedulingHandler) CreateSchedulePatient(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	var req createSchedulePatientReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	p, err := h.Sched.CreatePatient(c.Request.Context(), cl.ClinicID, scheduler.CreatePatientParams{
+		Name:      req.Name,
+		Phone:     req.Phone,
+		IIN:       req.IIN,
+		Birth:     req.Birth,
+		Gender:    req.Gender,
+		Comment:   req.Comment,
+		WhereKnow: req.WhereKnow,
+		IsChild:   req.IsChild,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, p)
+}
+
+type createScheduleAppointmentReq struct {
+	DoctorID  int       `json:"doctor_id"  binding:"required"`
+	PatientID int       `json:"patient_id" binding:"required"`
+	StartsAt  time.Time `json:"starts_at"  binding:"required"`
+	EndsAt    time.Time `json:"ends_at"    binding:"required"`
+	Zhaloba   string    `json:"zhaloba"`
+	Cabinet   string    `json:"cabinet"`
+	IsFirst   bool      `json:"is_first"`
+}
+
+// CreateScheduleAppointment serves POST /api/schedule/appointments
+// Creates a real appointment in MacDent via zapis/add.
+func (h *SchedulingHandler) CreateScheduleAppointment(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	var req createScheduleAppointmentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	if !req.EndsAt.After(req.StartsAt) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ends_at must be after starts_at"})
+		return
+	}
+	out, err := h.Sched.CreateMacdentAppointment(c.Request.Context(), cl.ClinicID, scheduler.CreateMacdentAppointmentParams{
+		DoctorID:  req.DoctorID,
+		PatientID: req.PatientID,
+		Start:     req.StartsAt,
+		End:       req.EndsAt,
+		Zhaloba:   req.Zhaloba,
+		Cabinet:   req.Cabinet,
+		IsFirst:   req.IsFirst,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, out)
+}
+
+type setAppointmentStatusReq struct {
+	Status int `json:"status"`
+}
+
+// SetScheduleAppointmentStatus serves PUT /api/schedule/appointments/:id/status
+// Status codes: 0=default, 1=confirm, 2=decline, 3=came, 4=left, 5=in_process, 6=late
+func (h *SchedulingHandler) SetScheduleAppointmentStatus(c *gin.Context) {
+	cl := middleware.ClaimsFrom(c)
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad id"})
+		return
+	}
+	var req setAppointmentStatusReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+	if req.Status < 0 || req.Status > 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "status must be 0..6"})
+		return
+	}
+	if err := h.Sched.SetAppointmentStatus(c.Request.Context(), cl.ClinicID, id, req.Status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // weekRange parses RFC3339/RFC3339Nano from/to strings; falls back to the current Mon–Sun week.
 func weekRange(fromStr, toStr string) (time.Time, time.Time) {
 	from, err1 := parseFlexTime(fromStr)
