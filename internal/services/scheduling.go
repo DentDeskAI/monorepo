@@ -20,19 +20,19 @@ var (
 
 // SchedulingService holds business logic that lives on top of the scheduling
 // layer: appointment validation, conversation lifecycle, etc. Pure passthrough
-// reads (list/get) are the responsibility of *scheduler.Service and are called
+// reads (list/get) are the responsibility of Scheduler and are called
 // directly from handlers.
 type SchedulingService struct {
 	Appointments  *appointments.Repo
 	Conversations *conversations.Repo
-	Sched         *scheduler.Service
+	Sched         scheduler.Scheduler
 	Doctors       *doctors.Repo
 }
 
 func NewSchedulingService(
 	apptRepo *appointments.Repo,
 	convRepo *conversations.Repo,
-	sched *scheduler.Service,
+	sched scheduler.Scheduler,
 	doctorsRepo *doctors.Repo,
 ) *SchedulingService {
 	return &SchedulingService{
@@ -43,9 +43,10 @@ func NewSchedulingService(
 	}
 }
 
-// SyncDoctors pulls the doctor list from MacDent and upserts each entry into
-// our local doctors table (keyed by external_id). This is the seed of what
-// will become a proper background sync worker.
+// SyncDoctors pulls the doctor list from the scheduler and upserts each entry
+// into the local doctors table (keyed by external_id). For MacDent clinics
+// this syncs remote doctors to local. For local/mock clinics it is a no-op
+// because the scheduler returns doctors already in the local DB.
 func (s *SchedulingService) SyncDoctors(ctx context.Context, clinicID uuid.UUID) (int, error) {
 	list, err := s.Sched.ListDoctors(ctx, clinicID)
 	if err != nil {

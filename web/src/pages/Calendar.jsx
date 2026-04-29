@@ -1,5 +1,14 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
+import { AppointmentDetailModal, CreateAppointmentModal } from "../features/appointments/AppointmentModals";
+import {
+  STATUS_CARD,
+  fetchDoctors,
+  fetchPatients,
+  fmtTime,
+  normalizeScheduleAppointment,
+  startOfWeek,
+} from "../features/appointments/schedule";
 import { useTranslation } from "../hooks/useTranslation";
 
 // i18n Keys
@@ -24,42 +33,17 @@ const i18nKeys = {
   },
 };
 
-// Parses MacDent date strings like "28.04.2026 10:45:00"
-function parseMacdentDate(s) {
-  const [datePart, timePart = "00:00:00"] = s.split(" ");
-  const [d, m, y] = datePart.split(".");
-  const [h, min, sec] = timePart.split(":");
-  return new Date(+y, +m - 1, +d, +h, +min, +sec);
-}
-
-// MacDent integer status → local status string
-const MD_STATUS = { 0: "scheduled", 1: "confirmed", 2: "cancelled" };
-
-function normalizeMacdent(a) {
-  return {
-    id: a.id,
-    starts_at: parseMacdentDate(a.start),
-    patient_name: a.cabinet || null, // Using cabinet as location placeholder
-    patient_phone: null,
-    doctor_name: null,
-    status: MD_STATUS[a.status] ?? "completed",
-  };
-}
-
-function startOfWeek(d) {
-  const x = new Date(d);
-  const day = (x.getDay() + 6) % 7; // Mon=0
-  x.setHours(0, 0, 0, 0);
-  x.setDate(x.getDate() - day);
-  return x;
-}
-
 export default function Calendar() {
   const { t } = useTranslation();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [tick, setTick] = useState(0);
+  const [createCtx, setCreateCtx] = useState(null);   // { date: Date }
+  const [detailCtx, setDetailCtx] = useState(null);   // appt object
+  const [doctors, setDoctors] = useState([]);
+  const [patients, setPatients] = useState([]);
 
   const daysShort = useMemo(
       () => [
@@ -83,19 +67,21 @@ export default function Calendar() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    api
-        .scheduleDoctors()
-        .then((resp) => {
-          if (resp && resp.appointments) {
-            const items = resp.appointments
-                .map(normalizeMacdent)
-                .filter(({ starts_at }) => {
-                  return starts_at >= weekStart && starts_at < weekEnd;
-                });
-            setItems(items);
-          } else {
-            setItems([]);
-          }
+
+    Promise.all([
+      api.scheduleDoctors(weekStart.toISOString(), weekEnd.toISOString()),
+      fetchDoctors(),
+      fetchPatients(),
+    ])
+        .then(([resp, docs, pats]) => {
+          setDoctors(docs);
+          setPatients(pats);
+          const doctorMap  = Object.fromEntries(docs.map((d) => [d.id, d.name]));
+          const patientMap = Object.fromEntries(pats.map((p) => [p.id, p]));
+          const normalized = (resp?.appointments ?? [])
+              .map((a) => normalizeScheduleAppointment(a, doctorMap, patientMap))
+              .filter(({ starts_at }) => starts_at >= weekStart && starts_at < weekEnd);
+          setItems(normalized);
         })
         .catch((err) => {
           console.error("Failed to fetch schedule:", err);
@@ -103,7 +89,9 @@ export default function Calendar() {
           setItems([]);
         })
         .finally(() => setLoading(false));
-  }, [weekStart, weekEnd]);
+  }, [weekStart, weekEnd, tick]);
+
+  const refresh = () => setTick((n) => n + 1);
 
   const byDayHour = useMemo(() => {
     const m = {};
@@ -114,6 +102,12 @@ export default function Calendar() {
       if (!m[key]) m[key] = [];
       m[key].push(a);
     }
+
+    // SORTING FIX: Sort appointments in each hour slot by minutes
+    Object.keys(m).forEach(key => {
+      m[key].sort((a, b) => a.starts_at.getTime() - b.starts_at.getTime());
+    });
+
     return m;
   }, [items]);
 
@@ -168,7 +162,7 @@ export default function Calendar() {
         </div>
 
         {/* CALENDAR GRID */}
-        <div className="flex-1 overflow-auto p-6 relative">
+        <div className="flex-1 overflow-auto p-4 lg:p-6 relative">
           {loading && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 z-10">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -187,10 +181,10 @@ export default function Calendar() {
               </div>
           )}
 
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden min-w-[900px]">
-            <div className="grid" style={{ gridTemplateColumns: "60px repeat(7, 1fr)" }}>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="grid" style={{ gridTemplateColumns: "50px repeat(7, minmax(120px, 1fr))" }}>
               {/* Header Row */}
-              <div className="bg-slate-50 dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 p-2" />
+              <div className="bg-slate-50 dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 p-2 sticky left-0 z-20" />
               {daysShort.map((d, i) => {
                 const date = new Date(weekStart);
                 date.setDate(date.getDate() + i);
@@ -216,41 +210,45 @@ export default function Calendar() {
               {/* Time Rows */}
               {Array.from({ length: 12 }, (_, i) => 9 + i).map((h) => (
                   <Fragment key={`row-${h}`}>
-                    {/* Time Label */}
-                    <div className="text-xs text-slate-400 font-medium text-center py-4 border-r border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
+                    <div className="text-[10px] text-slate-400 font-bold text-center py-4 border-r border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/90 sticky left-0 z-10">
                       {h}:00
                     </div>
 
-                    {/* Day Cells */}
                     {Array.from({ length: 7 }).map((_, dayIdx) => {
                       const cellItems = byDayHour[`${dayIdx}-${h}`] || [];
+                      const cellDate = new Date(weekStart);
+                      cellDate.setDate(cellDate.getDate() + dayIdx);
+                      cellDate.setHours(h, 0, 0, 0);
                       return (
                           <div
                               key={`${h}-${dayIdx}`}
-                              className="min-h-[80px] border-r border-b border-slate-100 dark:border-slate-700 p-1 space-y-1.5 hover:bg-slate-50/30 dark:hover:bg-slate-700/20 transition-colors"
+                              onClick={() => setCreateCtx({ date: cellDate })}
+                              className="min-h-[90px] border-r border-b border-slate-100 dark:border-slate-700 p-1 space-y-1.5 hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors cursor-pointer"
                           >
                             {cellItems.map((a) => {
+                              const cardCls = STATUS_CARD[a.status] ?? STATUS_CARD.scheduled;
                               const isCancelled = a.status === "cancelled";
-                              const d = a.starts_at;
+                              const secondary = [a.doctor_name, a.cabinet].filter(Boolean).join(" · ");
 
                               return (
                                   <div
                                       key={a.id}
-                                      className={`text-[11px] px-2 py-1.5 rounded border transition-all cursor-pointer ${
-                                          isCancelled
-                                              ? "bg-slate-50 dark:bg-slate-700 text-slate-400 border-slate-100 dark:border-slate-600 line-through"
-                                              : "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-800 shadow-sm hover:shadow-md"
-                                      }`}
+                                      onClick={(e) => { e.stopPropagation(); setDetailCtx(a); }}
+                                      className={`text-[10px] px-1.5 py-1 rounded border shadow-sm transition-all cursor-pointer hover:shadow-md ${cardCls} ${isCancelled ? "line-through" : ""}`}
                                   >
-                                    <div className="font-bold mb-0.5">
-                                      {String(d.getHours()).padStart(2, "0")}:{String(d.getMinutes()).padStart(2, "0")}
-                                      {" · "}
+                                    <div className="flex items-center justify-between font-bold mb-0.5 gap-1">
+                                      <span className="whitespace-nowrap">{fmtTime(a.starts_at)}</span>
+                                      {a.patient_is_first && (
+                                          <span className="text-[8px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded px-0.5 font-bold shrink-0">
+                                  NEW
+                                </span>
+                                      )}
+                                    </div>
+                                    <div className="truncate font-bold leading-tight">
                                       {a.patient_name || a.patient_phone || t(i18nKeys.calendar.no_patient)}
                                     </div>
-                                    {a.doctor_name && (
-                                        <div className="text-slate-500 dark:text-slate-400 truncate font-medium">
-                                          {a.doctor_name}
-                                        </div>
+                                    {secondary && (
+                                        <div className="truncate opacity-80 text-[9px] mt-0.5">{secondary}</div>
                                     )}
                                   </div>
                               );
@@ -263,6 +261,24 @@ export default function Calendar() {
             </div>
           </div>
         </div>
+
+        <CreateAppointmentModal
+            open={!!createCtx}
+            defaultDate={createCtx?.date}
+            doctors={doctors}
+            patients={patients}
+            onClose={() => setCreateCtx(null)}
+            onCreated={() => { setCreateCtx(null); refresh(); }}
+            t={t}
+        />
+
+        <AppointmentDetailModal
+            open={!!detailCtx}
+            appt={detailCtx}
+            onClose={() => setDetailCtx(null)}
+            onChanged={() => { setDetailCtx(null); refresh(); }}
+            t={t}
+        />
       </div>
   );
 }

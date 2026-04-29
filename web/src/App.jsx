@@ -7,6 +7,7 @@ import Calendar from "./pages/Calendar";
 import Patients from "./pages/Patients";
 import { getUser } from "./api/client";
 import Doctors from "./pages/Doctors.jsx";
+import RecordsTable from "./pages/RecordsTable";
 
 function Protected({ children }) {
   const user = getUser();
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="calendar" element={<Calendar />} />
           <Route path="patients" element={<Patients />} />
           <Route path="doctors" element={<Doctors />} />
+          <Route path="records" element={<RecordsTable />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

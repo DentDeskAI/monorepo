@@ -80,10 +80,17 @@ func main() {
 	doctorsRepo := doctors.NewRepo(database)
 
 	// --- Scheduler ---
-	// Single concrete service backed by the MacDent integration.
-	// When a second integration appears, introduce an interface here.
-	sched := scheduler.NewService(database)
-	log.Info().Msg("scheduler: ready (macdent integration)")
+	// Registry dispatches to the right backend (MacDent or Local) based on
+	// each clinic's scheduler_type column. Implements scheduler.Scheduler.
+	sched := scheduler.NewRegistry(
+		database,
+		&http.Client{Timeout: 15 * time.Second},
+		clinicsRepo,
+		doctorsRepo,
+		patientsRepo,
+		apptRepo,
+	)
+	log.Info().Msg("scheduler: registry ready (macdent + local)")
 
 	// --- LLM ---
 	var llmClient llm.Client
@@ -127,9 +134,10 @@ func main() {
 	// --- Handlers ---
 	authH := &handlers.AuthHandler{Svc: authSvc}
 	adminH := &handlers.AdminHandler{Svc: adminSvc}
-	crmH := &handlers.CRMHandler{Svc: crmSvc}
+	crmH := &handlers.CRMHandler{Svc: crmSvc, Patients: patientsRepo}
 	resourceH := &handlers.ResourceHandler{Svc: resourceSvc}
 	scheduleH := &handlers.SchedulingHandler{Sched: sched, Svc: schedulingSvc}
+	dashboardH := &handlers.DashboardHandler{Sched: sched}
 	waH := &handlers.WhatsAppHandler{
 		DB:            database,
 		Redis:         redisClient,
@@ -144,15 +152,16 @@ func main() {
 	}
 
 	router := (&httpx.Router{
-		AuthSvc:   authSvc,
-		Log:       log,
-		Origin:    cfg.CRMOrigin,
-		AuthH:     authH,
-		AdminH:    adminH,
-		CRMH:      crmH,
-		ResourceH: resourceH,
-		ScheduleH: scheduleH,
-		WhatsApp:  waH,
+		AuthSvc:    authSvc,
+		Log:        log,
+		Origin:     cfg.CRMOrigin,
+		AuthH:      authH,
+		AdminH:     adminH,
+		CRMH:       crmH,
+		ResourceH:  resourceH,
+		ScheduleH:  scheduleH,
+		DashboardH: dashboardH,
+		WhatsApp:   waH,
 	}).Build()
 
 	srv := &http.Server{

@@ -23,23 +23,27 @@ User-facing requests **never** hit an integration synchronously. If MacDent
 goes down, DentDesk continues to serve doctors, patients, appointments from
 our DB.
 
-## Where we are now (Phase 1)
+## Where we are now (Phase 1.5)
 
 We are not at the target yet. Today, several read endpoints (`/api/doctors`,
-`/api/patients`, `/api/schedule/*`) **read through MacDent live** instead of
-reading from our local repos. This is a deliberate, time-boxed shortcut that
-unblocks the MVP demo for clinics that already have a populated MacDent.
+`/api/patients`, `/api/schedule/*`) read through the configured scheduling
+backend for the clinic. For `scheduler_type='macdent'` that still means live
+MacDent calls; for `scheduler_type='local'` and `mock`, it means local
+PostgreSQL repos. This keeps the MVP usable for both staged demo clinics and
+clinics already populated in MacDent.
 
-What was cleaned up in Phase 1:
+What has been cleaned up:
 
 - The fake `Scheduler` interface with three implementations (`LocalAdapter`,
   `MockAdapter`, `MacDentAdapter`) was deleted. There was only ever one real
   implementation; the others were dead code.
 - `internal/macdent/` moved to `internal/integrations/macdent/` to make it
   visible that this is **one of N possible** integrations.
-- `internal/scheduler/` is now a single concrete `Service` that wraps the
-  MacDent client. No interface — that abstraction is deferred until a second
-  real integration appears.
+- `internal/scheduler/` owns the app-level scheduling contract. `Registry`
+  dispatches to either the MacDent-backed `Service` or `LocalScheduler` based
+  on `clinics.scheduler_type`.
+- The public scheduler contract uses DentDesk domain DTOs; MacDent response
+  shapes are translated inside the MacDent-backed implementation.
 - `services.SchedulingService` was trimmed to methods that carry actual
   business logic (`CreateAppointment`, `UpdateAppointmentStatus`,
   `SyncDoctors`, conversation lifecycle). Pass-through reads were deleted.
@@ -56,14 +60,14 @@ What was cleaned up in Phase 1:
   `ClientFor(ctx, db, http, clinicID)` is the single entry point that resolves
   per-tenant credentials and returns a ready-to-use client.
 - **`internal/scheduler/`** — domain types (`Doctor`, `Patient`, `Slot`,
-  `Stomatology`, `BookRequest`, `BookResult`) and the concrete `Service` that
-  coordinates them. **Read endpoints today call this service**; tomorrow the
-  same service signatures will read from local repos instead.
+  `Appointment`, `AppointmentDetail`, `RevenueRecord`) and the scheduling
+  backend contract. `Registry` is the entry point used by handlers and services.
 - **`internal/services/`** — business-logic services. Validation, orchestration,
   cross-repo writes. No pass-through methods.
 - **`internal/<entity>/`** (e.g. `doctors/`, `patients/`, `appointments/`) —
-  repositories over PostgreSQL. These will become the primary read source in
-  Phase 2.
+  repositories over PostgreSQL. These are already the primary read source for
+  local/mock clinics and will become the primary read source for MacDent clinics
+  after sync is introduced.
 
 ## Phase 2 (next, when justified)
 
@@ -74,13 +78,15 @@ comes first.
   our `doctors` and `patients` tables.
 - Switch handlers to read from local repos (`doctors.Repo.ListByClinic`, etc.).
 - Move appointment writes to: write local first → enqueue push to MacDent.
-- Keep `scheduler.Service` as the orchestrator; only its internals change.
+- Keep the scheduler contract stable; only the MacDent implementation and sync
+  worker internals change.
 
 ## Phase 3 (when there are two integrations)
 
 - Introduce an `Integration` interface designed against two real
-  implementations.
+  external integrations.
 - Reorganise `internal/integrations/` so each integration implements that
   interface.
 
-Until then: **one integration, one concrete service, no interface.**
+Until then: keep external DTOs inside integration packages and expose only
+DentDesk domain types to handlers, services, and the frontend API.

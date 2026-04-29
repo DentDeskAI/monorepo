@@ -18,6 +18,7 @@ const i18nKeys = {
       calendar: "layout.nav.calendar",
       patients: "layout.nav.patients",
       doctors: "layout.nav.doctors",
+      records: "layout.nav.records",
     },
   },
 };
@@ -34,6 +35,7 @@ export default function Layout() {
     { to: "/calendar", label: t(i18nKeys.layout.nav.calendar), icon: "📅" },
     { to: "/patients", label: t(i18nKeys.layout.nav.patients), icon: "👤" },
     { to: "/doctors", label: t(i18nKeys.layout.nav.doctors), icon: "👨‍⚕️" },
+    { to: "/records", label: t(i18nKeys.layout.nav.records), icon: "📋" },
   ];
 
   const onLogout = () => {
