@@ -1,3 +1,6 @@
+import { mockApi } from "./mock";
+
+const MOCK = import.meta.env.VITE_MOCK === "true";
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
 function getToken() {
@@ -29,7 +32,7 @@ async function request(path, { method = "GET", body } = {}) {
   return res.json();
 }
 
-export const api = {
+export const api = MOCK ? mockApi : {
   // auth
   login: (email, password) =>
     request("/auth/login", { method: "POST", body: { email, password } }),
