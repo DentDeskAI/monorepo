@@ -1,11 +1,8 @@
-// Package scheduler is the scheduling layer of DentDesk.
-//
-// Phase 1.5 note: handlers and services depend on the Scheduler contract and
-// Registry dispatches to the configured backend for each clinic. MacDent-backed
-// clinics still read through MacDent live; local/mock clinics read from
-// PostgreSQL repos. Long-term, MacDent clinics should become local-first via a
-// sync worker without changing this package's public domain types.
-package scheduler
+package scheduling
+
+// Service is the MacDent-backed Scheduler implementation.
+// It translates DentDesk domain types ↔ MacDent DTOs at this boundary.
+// The raw MacDent HTTP client lives in internal/integrations/macdent/.
 
 import (
 	"context"
@@ -19,174 +16,7 @@ import (
 	"github.com/dentdesk/dentdesk/internal/integrations/macdent"
 )
 
-// ── domain types ─────────────────────────────────────────────────────────────
-
-type Slot struct {
-	StartsAt time.Time  `json:"starts_at"`
-	EndsAt   time.Time  `json:"ends_at"`
-	DoctorID uuid.UUID  `json:"doctor_id"`
-	Doctor   string     `json:"doctor"`
-	ChairID  *uuid.UUID `json:"chair_id,omitempty"`
-}
-
-type Doctor struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Specialties []string `json:"specialties,omitempty"`
-}
-
-type Patient struct {
-	Name      string  `json:"name"`
-	Gender    *string `json:"gender"`
-	ID        int     `json:"id"`
-	IIN       *string `json:"iin"`
-	Number    string  `json:"number"`
-	Phone     *string `json:"phone"`
-	Birth     *string `json:"birth"`
-	IsChild   bool    `json:"isChild"`
-	Comment   string  `json:"comment"`
-	WhereKnow string  `json:"whereKnow"`
-}
-
-type Stomatology struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-type BookRequest struct {
-	ClinicID  uuid.UUID
-	PatientID uuid.UUID
-	DoctorID  uuid.UUID
-	ChairID   *uuid.UUID
-	StartsAt  time.Time
-	EndsAt    time.Time
-	Service   string
-}
-
-type BookResult struct {
-	AppointmentID uuid.UUID
-	ExternalID    *string
-}
-
-type Appointment struct {
-	ID      int    `json:"id"`
-	Doctor  int    `json:"doctor"`
-	Patient int    `json:"patient"`
-	Date    string `json:"date"`
-	Start   string `json:"start"`
-	End     string `json:"end"`
-	Status  int    `json:"status"`
-	Zhaloba string `json:"zhaloba"`
-	Comment string `json:"comment"`
-	IsFirst bool   `json:"isFirst"`
-	Cabinet string `json:"cabinet"`
-	Rasp    string `json:"rasp"`
-}
-
-type AppointmentsResponse struct {
-	Appointments []Appointment `json:"appointments"`
-}
-
-type AppointmentDetail struct {
-	ID      int                   `json:"id"`
-	Doctor  AppointmentDoctorRef  `json:"doctor"`
-	Patient AppointmentPatientRef `json:"patient"`
-	Date    string                `json:"date"`
-	Start   string                `json:"start"`
-	End     string                `json:"end"`
-	Status  int                   `json:"status"`
-	Zhaloba string                `json:"zhaloba"`
-	Comment string                `json:"comment"`
-	IsFirst bool                  `json:"isFirst"`
-	Cabinet string                `json:"cabinet"`
-	Rasp    string                `json:"rasp"`
-}
-
-type AppointmentDoctorRef struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-type AppointmentPatientRef struct {
-	ID    int     `json:"id"`
-	Name  string  `json:"name"`
-	Phone *string `json:"phone"`
-}
-
-type UpdateAppointmentParams struct {
-	DoctorID *int
-	Start    *time.Time
-	End      *time.Time
-	Zhaloba  *string
-	Comment  *string
-}
-
-type AppointmentRequestParams struct {
-	PatientName  string
-	PatientPhone string
-	Start        time.Time
-	End          time.Time
-	WhereKnow    string
-}
-
-type AppointmentRequestResult struct {
-	ID int `json:"id"`
-}
-
-type ScheduleAppointmentParams struct {
-	DoctorID  int
-	PatientID int
-	Start     time.Time
-	End       time.Time
-	Zhaloba   string
-	Cabinet   string
-	IsFirst   bool
-}
-
-type ScheduleAppointmentResult struct {
-	ID int `json:"id"`
-}
-
-type RevenueRecord struct {
-	ID          int
-	Date        string
-	Name        string
-	Amount      float64
-	Type        int
-	PaymentType string
-	Comment     string
-}
-
-// ── interface ─────────────────────────────────────────────────────────────────
-
-// Scheduler is the backend-agnostic scheduling interface.
-// Service (MacDent) and LocalScheduler both implement it.
-// Registry wraps both and dispatches based on clinic.scheduler_type.
-type Scheduler interface {
-	ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error)
-	GetDoctor(ctx context.Context, clinicID uuid.UUID, id string) (*Doctor, error)
-	ListPatients(ctx context.Context, clinicID uuid.UUID) ([]Patient, error)
-	GetPatient(ctx context.Context, clinicID uuid.UUID, id int) (*Patient, error)
-	CreatePatient(ctx context.Context, clinicID uuid.UUID, p CreatePatientParams) (*Patient, error)
-	GetClinic(ctx context.Context, clinicID uuid.UUID) (*Stomatology, error)
-	ListAppointments(ctx context.Context, clinicID uuid.UUID, from, to time.Time) (*AppointmentsResponse, error)
-	GetAppointmentByID(ctx context.Context, clinicID uuid.UUID, id int) (*AppointmentDetail, error)
-	CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error)
-	CreateScheduleAppointment(ctx context.Context, clinicID uuid.UUID, p ScheduleAppointmentParams) (*ScheduleAppointmentResult, error)
-	UpdateAppointment(ctx context.Context, clinicID uuid.UUID, id int, p UpdateAppointmentParams) error
-	RemoveAppointment(ctx context.Context, clinicID uuid.UUID, id int) error
-	SetAppointmentStatus(ctx context.Context, clinicID uuid.UUID, id, status int) error
-	SendAppointmentRequest(ctx context.Context, clinicID uuid.UUID, p AppointmentRequestParams) (*AppointmentRequestResult, error)
-	GetFreeSlots(ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string) ([]Slot, error)
-	GetRevenue(ctx context.Context, clinicID uuid.UUID, from, to time.Time) ([]RevenueRecord, error)
-	GetHistory(ctx context.Context, clinicID uuid.UUID, from, to time.Time) (*AppointmentsResponse, error)
-}
-
-// ── service ──────────────────────────────────────────────────────────────────
-
-// Service is the MacDent-backed scheduler implementation. The public Scheduler
-// contract above stays in DentDesk domain types; MacDent DTOs are translated at
-// this boundary.
+// Service implements Scheduler via the MacDent ERP REST API.
 type Service struct {
 	db   *sqlx.DB
 	http *http.Client
@@ -255,7 +85,7 @@ func (s *Service) ListPatients(ctx context.Context, clinicID uuid.UUID) ([]Patie
 	}
 	out := make([]Patient, 0, len(resp.Patients))
 	for _, p := range resp.Patients {
-		out = append(out, toPatient(p))
+		out = append(out, macdentPatientToScheduler(p))
 	}
 	return out, nil
 }
@@ -269,11 +99,33 @@ func (s *Service) GetPatient(ctx context.Context, clinicID uuid.UUID, id int) (*
 	if err != nil {
 		return nil, err
 	}
-	out := toPatient(*p)
+	out := macdentPatientToScheduler(*p)
 	return &out, nil
 }
 
-func toPatient(p macdent.Patient) Patient {
+func (s *Service) CreatePatient(ctx context.Context, clinicID uuid.UUID, p CreatePatientParams) (*Patient, error) {
+	c, err := s.macdent(ctx, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	mp, err := c.AddPatient(ctx, macdent.AddPatientParams{
+		Name:      p.Name,
+		Phone:     p.Phone,
+		IIN:       p.IIN,
+		Birth:     p.Birth,
+		Gender:    p.Gender,
+		Comment:   p.Comment,
+		WhereKnow: p.WhereKnow,
+		IsChild:   p.IsChild,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := macdentPatientToScheduler(*mp)
+	return &out, nil
+}
+
+func macdentPatientToScheduler(p macdent.Patient) Patient {
 	return Patient{
 		Name:      p.Name,
 		Gender:    p.Gender,
@@ -342,11 +194,11 @@ func (s *Service) GetAppointmentByID(ctx context.Context, clinicID uuid.UUID, id
 	if err != nil {
 		return nil, err
 	}
-	out := toAppointmentDetail(*detail)
+	out := macdentZapisDetailToScheduler(*detail)
 	return &out, nil
 }
 
-func toAppointmentDetail(a macdent.ZapisDetail) AppointmentDetail {
+func macdentZapisDetailToScheduler(a macdent.ZapisDetail) AppointmentDetail {
 	return AppointmentDetail{
 		ID: a.ID,
 		Doctor: AppointmentDoctorRef{
@@ -410,41 +262,6 @@ func (s *Service) CreateAppointment(ctx context.Context, req BookRequest) (*Book
 	return &BookResult{AppointmentID: uuid.New(), ExternalID: &ext}, nil
 }
 
-// ── direct MacDent creation (integer IDs) ────────────────────────────────────
-
-type CreatePatientParams struct {
-	Name      string
-	Phone     string
-	IIN       string
-	Birth     string
-	Gender    string
-	Comment   string
-	WhereKnow string
-	IsChild   bool
-}
-
-func (s *Service) CreatePatient(ctx context.Context, clinicID uuid.UUID, p CreatePatientParams) (*Patient, error) {
-	c, err := s.macdent(ctx, clinicID)
-	if err != nil {
-		return nil, err
-	}
-	mp, err := c.AddPatient(ctx, macdent.AddPatientParams{
-		Name:      p.Name,
-		Phone:     p.Phone,
-		IIN:       p.IIN,
-		Birth:     p.Birth,
-		Gender:    p.Gender,
-		Comment:   p.Comment,
-		WhereKnow: p.WhereKnow,
-		IsChild:   p.IsChild,
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := toPatient(*mp)
-	return &out, nil
-}
-
 func (s *Service) CreateScheduleAppointment(ctx context.Context, clinicID uuid.UUID, p ScheduleAppointmentParams) (*ScheduleAppointmentResult, error) {
 	c, err := s.macdent(ctx, clinicID)
 	if err != nil {
@@ -491,7 +308,7 @@ func (s *Service) SendAppointmentRequest(ctx context.Context, clinicID uuid.UUID
 	return &AppointmentRequestResult{ID: res.ID}, nil
 }
 
-// ── rashodi ──────────────────────────────────────────────────────────────────
+// ── revenue ───────────────────────────────────────────────────────────────────
 
 func (s *Service) GetRevenue(ctx context.Context, clinicID uuid.UUID, from, to time.Time) ([]RevenueRecord, error) {
 	c, err := s.macdent(ctx, clinicID)
@@ -517,11 +334,9 @@ func (s *Service) GetRevenue(ctx context.Context, clinicID uuid.UUID, from, to t
 	return out, nil
 }
 
-// ── slots ────────────────────────────────────────────────────────────────────
+// ── free slots ────────────────────────────────────────────────────────────────
 
-func (s *Service) GetFreeSlots(
-	ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string,
-) ([]Slot, error) {
+func (s *Service) GetFreeSlots(ctx context.Context, clinicID uuid.UUID, from, to time.Time, specialty string) ([]Slot, error) {
 	c, err := s.macdent(ctx, clinicID)
 	if err != nil {
 		return nil, err
@@ -555,25 +370,7 @@ func (s *Service) GetFreeSlots(
 	return slots, nil
 }
 
-type HistoryRecord struct {
-	Date          time.Time
-	Birthday      *time.Time
-	Amount        float64
-	PatientName   string
-	PhoneNumber   string
-	ServiceType   string
-	PaymentMethod string
-	DoctorName    string
-}
-
-type HistoryResponse struct {
-	Records []HistoryRecord
-}
-
-// GetHistory returns the historical appointments for a clinic over a date range.
-// For now this is the same dataset as ListAppointments (live MacDent zapis/find
-// already includes completed and cancelled records). When payment data is
-// integrated, enrich the records here.
+// GetHistory returns historical appointments (same dataset as ListAppointments for MacDent).
 func (s *Service) GetHistory(ctx context.Context, clinicID uuid.UUID, from, to time.Time) (*AppointmentsResponse, error) {
 	return s.ListAppointments(ctx, clinicID, from, to)
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dentdesk/dentdesk/internal/http/middleware"
-	"github.com/dentdesk/dentdesk/internal/scheduler"
+	"github.com/dentdesk/dentdesk/internal/scheduling"
 	"github.com/dentdesk/dentdesk/internal/services"
 )
 
@@ -18,7 +18,7 @@ import (
 // Scheduler directly (no business logic to add). Endpoints with
 // validation or DB writes go through the SchedulingService.
 type SchedulingHandler struct {
-	Sched scheduler.Scheduler
+	Sched scheduling.Scheduler
 	Svc   *services.SchedulingService
 }
 
@@ -264,7 +264,7 @@ func (h *SchedulingHandler) UpdateScheduleAppointment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 		return
 	}
-	err = h.Sched.UpdateAppointment(c.Request.Context(), cl.ClinicID, id, scheduler.UpdateAppointmentParams{
+	err = h.Sched.UpdateAppointment(c.Request.Context(), cl.ClinicID, id, scheduling.UpdateAppointmentParams{
 		DoctorID: req.DoctorID,
 		Start:    req.StartsAt,
 		End:      req.EndsAt,
@@ -331,7 +331,7 @@ func (h *SchedulingHandler) SendAppointmentRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ends_at must be after starts_at"})
 		return
 	}
-	res, err := h.Sched.SendAppointmentRequest(c.Request.Context(), cl.ClinicID, scheduler.AppointmentRequestParams{
+	res, err := h.Sched.SendAppointmentRequest(c.Request.Context(), cl.ClinicID, scheduling.AppointmentRequestParams{
 		PatientName:  req.PatientName,
 		PatientPhone: req.PatientPhone,
 		Start:        req.StartsAt,
@@ -367,7 +367,7 @@ func (h *SchedulingHandler) CreateSchedulePatient(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 		return
 	}
-	p, err := h.Sched.CreatePatient(c.Request.Context(), cl.ClinicID, scheduler.CreatePatientParams{
+	p, err := h.Sched.CreatePatient(c.Request.Context(), cl.ClinicID, scheduling.CreatePatientParams{
 		Name:      req.Name,
 		Phone:     req.Phone,
 		IIN:       req.IIN,
@@ -406,7 +406,7 @@ func (h *SchedulingHandler) CreateScheduleAppointment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ends_at must be after starts_at"})
 		return
 	}
-	out, err := h.Sched.CreateScheduleAppointment(c.Request.Context(), cl.ClinicID, scheduler.ScheduleAppointmentParams{
+	out, err := h.Sched.CreateScheduleAppointment(c.Request.Context(), cl.ClinicID, scheduling.ScheduleAppointmentParams{
 		DoctorID:  req.DoctorID,
 		PatientID: req.PatientID,
 		Start:     req.StartsAt,

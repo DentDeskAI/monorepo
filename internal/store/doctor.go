@@ -1,4 +1,4 @@
-package doctors
+package store
 
 import (
 	"context"
@@ -17,11 +17,11 @@ type Doctor struct {
 	SeqID      int       `db:"seq_id" json:"seq_id"`
 }
 
-type Repo struct{ db *sqlx.DB }
+type DoctorRepo struct{ db *sqlx.DB }
 
-func NewRepo(db *sqlx.DB) *Repo { return &Repo{db: db} }
+func NewDoctorRepo(db *sqlx.DB) *DoctorRepo { return &DoctorRepo{db: db} }
 
-func (r *Repo) List(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
+func (r *DoctorRepo) List(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
 	var out []Doctor
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id
@@ -29,7 +29,7 @@ func (r *Repo) List(ctx context.Context, clinicID uuid.UUID) ([]Doctor, error) {
 	return out, err
 }
 
-func (r *Repo) FindBySpecialty(ctx context.Context, clinicID uuid.UUID, specialty string) ([]Doctor, error) {
+func (r *DoctorRepo) FindBySpecialty(ctx context.Context, clinicID uuid.UUID, specialty string) ([]Doctor, error) {
 	var out []Doctor
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id
@@ -38,7 +38,7 @@ func (r *Repo) FindBySpecialty(ctx context.Context, clinicID uuid.UUID, specialt
 	return out, err
 }
 
-func (r *Repo) GetByExternalID(ctx context.Context, clinicID uuid.UUID, externalID string) (*Doctor, error) {
+func (r *DoctorRepo) GetByExternalID(ctx context.Context, clinicID uuid.UUID, externalID string) (*Doctor, error) {
 	var d Doctor
 	err := r.db.GetContext(ctx, &d,
 		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id
@@ -49,7 +49,7 @@ func (r *Repo) GetByExternalID(ctx context.Context, clinicID uuid.UUID, external
 	return &d, nil
 }
 
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Doctor, error) {
+func (r *DoctorRepo) Get(ctx context.Context, id uuid.UUID) (*Doctor, error) {
 	var d Doctor
 	err := r.db.GetContext(ctx, &d,
 		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id FROM doctors WHERE id=$1`, id)
@@ -59,7 +59,7 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Doctor, error) {
 	return &d, nil
 }
 
-func (r *Repo) GetBySeqID(ctx context.Context, clinicID uuid.UUID, seqID int) (*Doctor, error) {
+func (r *DoctorRepo) GetBySeqID(ctx context.Context, clinicID uuid.UUID, seqID int) (*Doctor, error) {
 	var d Doctor
 	err := r.db.GetContext(ctx, &d,
 		`SELECT id, clinic_id, external_id, name, specialty, active, seq_id
@@ -70,8 +70,8 @@ func (r *Repo) GetBySeqID(ctx context.Context, clinicID uuid.UUID, seqID int) (*
 	return &d, nil
 }
 
-// Upsert inserts a doctor identified by external_id, or updates name/specialty if it already exists.
-func (r *Repo) Upsert(ctx context.Context, clinicID uuid.UUID, name string, specialty *string, externalID string) error {
+// Upsert inserts a doctor by external_id, or updates name/specialty if it already exists.
+func (r *DoctorRepo) Upsert(ctx context.Context, clinicID uuid.UUID, name string, specialty *string, externalID string) error {
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO doctors (clinic_id, name, specialty, external_id)
 		 VALUES ($1, $2, $3, $4)
@@ -81,7 +81,7 @@ func (r *Repo) Upsert(ctx context.Context, clinicID uuid.UUID, name string, spec
 	return err
 }
 
-func (r *Repo) Create(ctx context.Context, clinicID uuid.UUID, name string, specialty *string, externalID *string) (*Doctor, error) {
+func (r *DoctorRepo) Create(ctx context.Context, clinicID uuid.UUID, name string, specialty *string, externalID *string) (*Doctor, error) {
 	var d Doctor
 	err := r.db.GetContext(ctx, &d,
 		`INSERT INTO doctors (clinic_id, name, specialty, external_id)
@@ -91,14 +91,14 @@ func (r *Repo) Create(ctx context.Context, clinicID uuid.UUID, name string, spec
 	return &d, err
 }
 
-func (r *Repo) Update(ctx context.Context, id uuid.UUID, name string, specialty *string, active bool) error {
+func (r *DoctorRepo) Update(ctx context.Context, id uuid.UUID, name string, specialty *string, active bool) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE doctors SET name=$1, specialty=$2, active=$3 WHERE id=$4`,
 		name, specialty, active, id)
 	return err
 }
 
-func (r *Repo) Deactivate(ctx context.Context, id uuid.UUID) error {
+func (r *DoctorRepo) Deactivate(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE doctors SET active=FALSE WHERE id=$1`, id)
 	return err
 }

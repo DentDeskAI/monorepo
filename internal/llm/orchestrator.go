@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/dentdesk/dentdesk/internal/conversations"
-	"github.com/dentdesk/dentdesk/internal/scheduler"
+	"github.com/dentdesk/dentdesk/internal/scheduling"
+	"github.com/dentdesk/dentdesk/internal/store"
 )
 
 // Intent — что пациент хочет.
@@ -39,18 +39,18 @@ type Extracted struct {
 // Orchestrator связывает LLM с расписанием и диалогом.
 type Orchestrator struct {
 	llm   Client
-	sched scheduler.Scheduler
+	sched scheduling.Scheduler
 	log   zerolog.Logger
 }
 
-func NewOrchestrator(llm Client, sched scheduler.Scheduler, log zerolog.Logger) *Orchestrator {
+func NewOrchestrator(llm Client, sched scheduling.Scheduler, log zerolog.Logger) *Orchestrator {
 	return &Orchestrator{llm: llm, sched: sched, log: log}
 }
 
 // ConvState — состояние диалога, хранится в conversations.context.
 type ConvState struct {
 	LastIntent     Intent              `json:"last_intent,omitempty"`
-	PendingSlots   []scheduler.Slot    `json:"pending_slots,omitempty"`
+	PendingSlots   []scheduling.Slot    `json:"pending_slots,omitempty"`
 	PendingService string              `json:"pending_service,omitempty"`
 }
 
@@ -59,8 +59,8 @@ type Reply struct {
 	Text         string
 	NewState     ConvState
 	ActionTaken  string // "booked" | "slots_offered" | "handoff" | ""
-	Appointment  *scheduler.BookResult
-	ChosenSlot   *scheduler.Slot
+	Appointment  *scheduling.BookResult
+	ChosenSlot   *scheduling.Slot
 	Meta         map[string]any
 }
 
@@ -71,13 +71,13 @@ func (o *Orchestrator) Handle(
 	ctx context.Context,
 	clinicID, patientID uuid.UUID,
 	incoming string,
-	history []conversations.Message,
+	history []store.Message,
 	state ConvState,
 ) (*Reply, error) {
 	// 1) Если бот только что предложил слоты — сначала пытаемся распознать выбор.
 	if len(state.PendingSlots) > 0 {
 		if chosen := matchSlotChoice(incoming, state.PendingSlots); chosen != nil {
-			book, err := o.sched.CreateAppointment(ctx, scheduler.BookRequest{
+			book, err := o.sched.CreateAppointment(ctx, scheduling.BookRequest{
 				ClinicID:  clinicID,
 				PatientID: patientID,
 				DoctorID:  chosen.DoctorID,
@@ -203,7 +203,7 @@ func (o *Orchestrator) classify(ctx context.Context, incoming string) (*Extracte
 func (o *Orchestrator) generateReply(
 	ctx context.Context,
 	incoming string,
-	history []conversations.Message,
+	history []store.Message,
 	slotHint string,
 ) (string, error) {
 	msgs := make([]Message, 0, len(history)+2)
@@ -239,7 +239,7 @@ func (o *Orchestrator) generateReply(
 }
 
 // matchSlotChoice — пытается понять, какой слот выбрал пациент в свободной форме.
-func matchSlotChoice(msg string, slots []scheduler.Slot) *scheduler.Slot {
+func matchSlotChoice(msg string, slots []scheduling.Slot) *scheduling.Slot {
 	m := strings.ToLower(strings.TrimSpace(msg))
 	if m == "" {
 		return nil
@@ -310,12 +310,12 @@ func detectTime(m string) (int, int, bool) {
 
 func isDigit(b byte) bool { return b >= '0' && b <= '9' }
 
-func pickDiverseSlots(slots []scheduler.Slot, n int) []scheduler.Slot {
+func pickDiverseSlots(slots []scheduling.Slot, n int) []scheduling.Slot {
 	if len(slots) <= n {
 		return slots
 	}
 	// Выбираем равномерно: первый, середина, последний из топа.
-	out := []scheduler.Slot{slots[0]}
+	out := []scheduling.Slot{slots[0]}
 	if n >= 2 {
 		out = append(out, slots[len(slots)/2])
 	}
@@ -325,7 +325,7 @@ func pickDiverseSlots(slots []scheduler.Slot, n int) []scheduler.Slot {
 	return out
 }
 
-func slotsToString(slots []scheduler.Slot) string {
+func slotsToString(slots []scheduling.Slot) string {
 	parts := make([]string, 0, len(slots))
 	for i, s := range slots {
 		parts = append(parts, fmt.Sprintf("%d) %s к %s", i+1, formatSlotHuman(s), s.Doctor))
@@ -333,7 +333,7 @@ func slotsToString(slots []scheduler.Slot) string {
 	return strings.Join(parts, "; ")
 }
 
-func formatSlotHuman(s scheduler.Slot) string {
+func formatSlotHuman(s scheduling.Slot) string {
 	now := time.Now()
 	day := ""
 	d := s.StartsAt

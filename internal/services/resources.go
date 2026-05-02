@@ -5,30 +5,28 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/dentdesk/dentdesk/internal/chairs"
-	"github.com/dentdesk/dentdesk/internal/doctors"
-	"github.com/dentdesk/dentdesk/internal/patients"
+	"github.com/dentdesk/dentdesk/internal/store"
 )
 
 type ResourceService struct {
-	Doctors  *doctors.Repo
-	Chairs   *chairs.Repo
-	Patients *patients.Repo
+	Doctors  *store.DoctorRepo
+	Chairs   *store.ChairRepo
+	Patients *store.PatientRepo
 }
 
-func NewResourceService(doctorsRepo *doctors.Repo, chairsRepo *chairs.Repo, patientsRepo *patients.Repo) *ResourceService {
+func NewResourceService(doctorsRepo *store.DoctorRepo, chairsRepo *store.ChairRepo, patientsRepo *store.PatientRepo) *ResourceService {
 	return &ResourceService{Doctors: doctorsRepo, Chairs: chairsRepo, Patients: patientsRepo}
 }
 
-func (s *ResourceService) CreateDoctor(ctx context.Context, clinicID uuid.UUID, name string, specialty, externalID *string) (*doctors.Doctor, error) {
+func (s *ResourceService) CreateDoctor(ctx context.Context, clinicID uuid.UUID, name string, specialty, externalID *string) (*store.Doctor, error) {
 	return s.Doctors.Create(ctx, clinicID, name, specialty, externalID)
 }
 
-func (s *ResourceService) GetDoctor(ctx context.Context, id uuid.UUID) (*doctors.Doctor, error) {
+func (s *ResourceService) GetDoctor(ctx context.Context, id uuid.UUID) (*store.Doctor, error) {
 	return s.Doctors.Get(ctx, id)
 }
 
-func (s *ResourceService) GetDoctorByExternalID(ctx context.Context, clinicID uuid.UUID, externalID string) (*doctors.Doctor, error) {
+func (s *ResourceService) GetDoctorByExternalID(ctx context.Context, clinicID uuid.UUID, externalID string) (*store.Doctor, error) {
 	return s.Doctors.GetByExternalID(ctx, clinicID, externalID)
 }
 
@@ -40,11 +38,11 @@ func (s *ResourceService) DeactivateDoctor(ctx context.Context, id uuid.UUID) er
 	return s.Doctors.Deactivate(ctx, id)
 }
 
-func (s *ResourceService) ListChairs(ctx context.Context, clinicID uuid.UUID) ([]chairs.Chair, error) {
+func (s *ResourceService) ListChairs(ctx context.Context, clinicID uuid.UUID) ([]store.Chair, error) {
 	return s.Chairs.List(ctx, clinicID)
 }
 
-func (s *ResourceService) CreateChair(ctx context.Context, clinicID uuid.UUID, name string, externalID *string) (*chairs.Chair, error) {
+func (s *ResourceService) CreateChair(ctx context.Context, clinicID uuid.UUID, name string, externalID *string) (*store.Chair, error) {
 	return s.Chairs.Create(ctx, clinicID, name, externalID)
 }
 
@@ -56,7 +54,7 @@ func (s *ResourceService) DeactivateChair(ctx context.Context, id uuid.UUID) err
 	return s.Chairs.Deactivate(ctx, id)
 }
 
-func (s *ResourceService) CreatePatient(ctx context.Context, clinicID uuid.UUID, phone, language string, name, externalID *string) (*patients.Patient, error) {
+func (s *ResourceService) CreatePatient(ctx context.Context, clinicID uuid.UUID, phone, language string, name, externalID *string) (*store.Patient, error) {
 	lang := language
 	if lang == "" {
 		lang = "ru"
@@ -64,7 +62,7 @@ func (s *ResourceService) CreatePatient(ctx context.Context, clinicID uuid.UUID,
 	return s.Patients.Create(ctx, clinicID, phone, lang, name, externalID)
 }
 
-func (s *ResourceService) GetPatient(ctx context.Context, id uuid.UUID) (*patients.Patient, error) {
+func (s *ResourceService) GetPatient(ctx context.Context, id uuid.UUID) (*store.Patient, error) {
 	return s.Patients.Get(ctx, id)
 }
 
