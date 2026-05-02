@@ -1,4 +1,4 @@
-package clinics
+package store
 
 import (
 	"context"
@@ -22,7 +22,7 @@ type Clinic struct {
 	CreatedAt       time.Time       `db:"created_at" json:"created_at"`
 }
 
-type UpdateFields struct {
+type ClinicUpdateFields struct {
 	Name            string
 	Timezone        string
 	WorkingHours    json.RawMessage
@@ -30,11 +30,11 @@ type UpdateFields struct {
 	SchedulerType   string
 }
 
-type Repo struct{ db *sqlx.DB }
+type ClinicRepo struct{ db *sqlx.DB }
 
-func NewRepo(db *sqlx.DB) *Repo { return &Repo{db: db} }
+func NewClinicRepo(db *sqlx.DB) *ClinicRepo { return &ClinicRepo{db: db} }
 
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Clinic, error) {
+func (r *ClinicRepo) Get(ctx context.Context, id uuid.UUID) (*Clinic, error) {
 	var c Clinic
 	err := r.db.GetContext(ctx, &c,
 		`SELECT id, name, timezone, whatsapp_phone_id, scheduler_type,
@@ -46,7 +46,7 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Clinic, error) {
 	return &c, nil
 }
 
-func (r *Repo) Create(ctx context.Context, name, timezone, schedulerType string) (*Clinic, error) {
+func (r *ClinicRepo) Create(ctx context.Context, name, timezone, schedulerType string) (*Clinic, error) {
 	var c Clinic
 	err := r.db.GetContext(ctx, &c,
 		`INSERT INTO clinics (name, timezone, scheduler_type)
@@ -57,7 +57,7 @@ func (r *Repo) Create(ctx context.Context, name, timezone, schedulerType string)
 	return &c, err
 }
 
-func (r *Repo) Update(ctx context.Context, id uuid.UUID, f UpdateFields) error {
+func (r *ClinicRepo) Update(ctx context.Context, id uuid.UUID, f ClinicUpdateFields) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE clinics
 		 SET name=$1, timezone=$2, working_hours=$3, slot_duration_min=$4, scheduler_type=$5

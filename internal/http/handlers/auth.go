@@ -23,7 +23,7 @@ type AuthHandler struct {
 }
 
 type loginReq struct {
-	Email    string `json:"email" binding:"required" example:"admin@demo.kz"`
+	Email    string `json:"email" binding:"required" example:"test@demo.kz"`
 	Password string `json:"password" binding:"required" example:"demo1234"`
 }
 

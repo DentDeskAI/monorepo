@@ -7,11 +7,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dentdesk/dentdesk/internal/appointments"
 	"github.com/dentdesk/dentdesk/internal/notifications"
 	"github.com/dentdesk/dentdesk/internal/platform/config"
 	"github.com/dentdesk/dentdesk/internal/platform/db"
 	"github.com/dentdesk/dentdesk/internal/platform/logger"
+	"github.com/dentdesk/dentdesk/internal/store"
 	"github.com/dentdesk/dentdesk/internal/whatsapp"
 )
 
@@ -33,15 +33,12 @@ func main() {
 		DB:       database,
 		Log:      log,
 		WhatsApp: whatsapp.NewClient(cfg.WhatsAppToken, cfg.WhatsAppPhoneNumberID, cfg.WhatsAppAPIVersion),
-		Repo:     appointments.NewRepo(database),
+		Repo:     store.NewAppointmentRepo(database),
 	}
 
-	// Единый тикер — реминдеры проверяются каждые 5 минут, этого достаточно
-	// для окон 24ч±30м и 2ч±30м. Прод-вариант — разные тикеры.
 	tick := time.NewTicker(5 * time.Minute)
 	defer tick.Stop()
 
-	// сразу первый прогон
 	sender.RunTick(ctx)
 
 	stop := make(chan os.Signal, 1)

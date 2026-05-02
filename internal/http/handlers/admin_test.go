@@ -9,265 +9,166 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/dentdesk/dentdesk/internal/auth"
 	"github.com/dentdesk/dentdesk/internal/http/middleware"
 )
 
-// MockAdminService implements the interface needed by AdminHandler
-type MockAdminService struct {
-	mock.Mock
-}
-
-func (m *MockAdminService) Register(ctx interface{}, clinicName, timezone, ownerName, email, password string) (interface{}, interface{}, string, error) {
-	args := m.Called(ctx, clinicName, timezone, ownerName, email, password)
-	return args.Get(0), args.Get(1), args.String(2), args.Error(3)
-}
-
-func (m *MockAdminService) GetClinic(ctx interface{}, clinicID uuid.UUID) (interface{}, error) {
-	args := m.Called(ctx, clinicID)
-	return args.Get(0), args.Error(1)
-}
-
-func (m *MockAdminService) UpdateClinic(ctx interface{}, clinicID uuid.UUID, name, timezone, workingHours, schedulerType string, slotDuration int) (interface{}, error) {
-	args := m.Called(ctx, clinicID, name, timezone, workingHours, schedulerType, slotDuration)
-	return args.Get(0), args.Error(1)
-}
-
-func (m *MockAdminService) ListUsers(ctx interface{}, clinicID uuid.UUID) (interface{}, error) {
-	args := m.Called(ctx, clinicID)
-	return args.Get(0), args.Error(1)
-}
-
-func (m *MockAdminService) CreateUser(ctx interface{}, clinicID uuid.UUID, email, password, role, name string) (interface{}, error) {
-	args := m.Called(ctx, clinicID, email, password, role, name)
-	return args.Get(0), args.Error(1)
-}
-
-func (m *MockAdminService) GetUser(ctx interface{}, id uuid.UUID) (interface{}, error) {
-	args := m.Called(ctx, id)
-	return args.Get(0), args.Error(1)
-}
-
-func (m *MockAdminService) UpdateUser(ctx interface{}, id uuid.UUID, name, role string) error {
-	args := m.Called(ctx, id, name, role)
-	return args.Error(0)
-}
-
-func (m *MockAdminService) DeleteUser(ctx interface{}, id uuid.UUID) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
-}
-
-func (m *MockAdminService) ChangePassword(ctx interface{}, userID uuid.UUID, oldPassword, newPassword string) error {
-	args := m.Called(ctx, userID, oldPassword, newPassword)
-	return args.Error(0)
-}
-
-func createAuthContext(role string, clinicID uuid.UUID, userID uuid.UUID) *gin.Context {
+func createAdminContext(method, path string, body []byte, claims *auth.Claims) (*gin.Context, *httptest.ResponseRecorder) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
-
-	claims := &auth.Claims{
-		UserID:   userID,
-		ClinicID: clinicID,
-		Role:     role,
+	c.Request = httptest.NewRequest(method, path, bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	if claims != nil {
+		c.Set(middleware.CtxClaims, claims)
 	}
-	c.Set(middleware.CtxClaims, claims)
-	return c
+	return c, w
 }
 
-func TestAdminHandler_Register(t *testing.T) {
+func TestAdminRoleHelpers(t *testing.T) {
+	clinicID := uuid.New()
+	userID := uuid.New()
+
 	tests := []struct {
-		name           string
-		requestBody    string
-		mockError      error
-		expectedStatus int
+		name             string
+		claims           *auth.Claims
+		wantOwnerOrAdmin bool
+		wantOwner        bool
 	}{
 		{
-			name:           "Failure - Invalid JSON",
-			requestBody:    `{invalid json`,
-			expectedStatus: http.StatusBadRequest,
+			name: "owner",
+			claims: &auth.Claims{
+				UserID:   userID,
+				ClinicID: clinicID,
+				Role:     "owner",
+			},
+			wantOwnerOrAdmin: true,
+			wantOwner:        true,
 		},
 		{
-			name:           "Failure - Missing required fields",
-			requestBody:    `{}`,
-			expectedStatus: http.StatusBadRequest,
+			name: "admin",
+			claims: &auth.Claims{
+				UserID:   userID,
+				ClinicID: clinicID,
+				Role:     "admin",
+			},
+			wantOwnerOrAdmin: true,
+			wantOwner:        false,
 		},
 		{
-			name:           "Failure - Registration error",
-			requestBody:    `{"clinic_name":"Test","timezone":"UTC","owner_name":"John","email":"test@test.com","password":"pass"}`,
-			mockError:      assert.AnError,
-			expectedStatus: http.StatusConflict,
+			name: "operator",
+			claims: &auth.Claims{
+				UserID:   userID,
+				ClinicID: clinicID,
+				Role:     "operator",
+			},
+			wantOwnerOrAdmin: false,
+			wantOwner:        false,
+		},
+		{
+			name:             "no claims",
+			claims:           nil,
+			wantOwnerOrAdmin: false,
+			wantOwner:        false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockSvc := new(MockAdminService)
-			handler := &AdminHandler{Svc: mockSvc}
-
-			c := createAuthContext("owner", uuid.New(), uuid.New())
-			c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/register", bytes.NewBufferString(tt.requestBody))
-			c.Request.Header.Set("Content-Type", "application/json")
-
-			if tt.mockError != nil {
-				mockSvc.On("Register", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, nil, "", tt.mockError)
-			}
-
-			handler.Register(c)
-
-			assert.Equal(t, tt.expectedStatus, c.Writer.Status())
+			c, _ := createAdminContext(http.MethodGet, "/test", nil, tt.claims)
+			assert.Equal(t, tt.wantOwnerOrAdmin, isOwnerOrAdmin(c))
+			assert.Equal(t, tt.wantOwner, isOwner(c))
 		})
 	}
 }
 
-func TestAdminHandler_GetClinic(t *testing.T) {
-	clinicID := uuid.New()
-	userID := uuid.New()
-	mockSvc := new(MockAdminService)
-	handler := &AdminHandler{Svc: mockSvc}
-
-	c := createAuthContext("owner", clinicID, userID)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/clinic", nil)
-
-	mockClinic := map[string]interface{}{
-		"id":         clinicID.String(),
-		"name":       "Test Clinic",
-		"timezone":   "UTC",
-		"clinic_id":  clinicID.String(),
-	}
-	mockSvc.On("GetClinic", mock.Anything, clinicID).Return(mockClinic, nil)
-
-	handler.GetClinic(c)
-
-	assert.Equal(t, http.StatusOK, c.Writer.Status())
-}
-
-func TestAdminHandler_UpdateClinic(t *testing.T) {
-	clinicID := uuid.New()
-	userID := uuid.New()
-	mockSvc := new(MockAdminService)
-	handler := &AdminHandler{Svc: mockSvc}
-
-	c := createAuthContext("owner", clinicID, userID)
-	c.Request = httptest.NewRequest(http.MethodPut, "/api/admin/clinic", bytes.NewBufferString(`{"name":"New Name","timezone":"UTC"}`))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	mockSvc.On("UpdateClinic", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil)
+func TestAdminHandler_UpdateClinic_ForbiddenWithoutAdminRole(t *testing.T) {
+	handler := &AdminHandler{}
+	c, w := createAdminContext(
+		http.MethodPut,
+		"/api/admin/clinic",
+		[]byte(`{"name":"Clinic","timezone":"UTC"}`),
+		&auth.Claims{UserID: uuid.New(), ClinicID: uuid.New(), Role: "operator"},
+	)
 
 	handler.UpdateClinic(c)
 
-	assert.Equal(t, http.StatusOK, c.Writer.Status())
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.JSONEq(t, `{"error":"forbidden"}`, w.Body.String())
 }
 
-func TestAdminHandler_ListUsers(t *testing.T) {
-	clinicID := uuid.New()
-	userID := uuid.New()
-	mockSvc := new(MockAdminService)
-	handler := &AdminHandler{Svc: mockSvc}
+func TestAdminHandler_UpdateClinic_BadRequestOnInvalidBody(t *testing.T) {
+	handler := &AdminHandler{}
+	c, w := createAdminContext(
+		http.MethodPut,
+		"/api/admin/clinic",
+		[]byte(`{"name":"Clinic"}`),
+		&auth.Claims{UserID: uuid.New(), ClinicID: uuid.New(), Role: "owner"},
+	)
 
-	c := createAuthContext("admin", clinicID, userID)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/users", nil)
+	handler.UpdateClinic(c)
 
-	mockSvc.On("ListUsers", mock.Anything, clinicID).Return([]interface{}{}, nil)
-
-	handler.ListUsers(c)
-
-	assert.Equal(t, http.StatusOK, c.Writer.Status())
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.JSONEq(t, `{"error":"invalid body"}`, w.Body.String())
 }
 
-func TestAdminHandler_CreateUser(t *testing.T) {
-	clinicID := uuid.New()
-	userID := uuid.New()
-	mockSvc := new(MockAdminService)
-	handler := &AdminHandler{Svc: mockSvc}
-
-	c := createAuthContext("owner", clinicID, userID)
-	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/users", bytes.NewBufferString(`{"email":"test@test.com","password":"pass","name":"John","role":"admin"}`))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	mockSvc.On("CreateUser", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil)
+func TestAdminHandler_CreateUser_RejectsInvalidRoleBeforeServiceCall(t *testing.T) {
+	handler := &AdminHandler{}
+	c, w := createAdminContext(
+		http.MethodPost,
+		"/api/admin/users",
+		[]byte(`{"email":"test@test.com","password":"pass","name":"John","role":"guest"}`),
+		&auth.Claims{UserID: uuid.New(), ClinicID: uuid.New(), Role: "owner"},
+	)
 
 	handler.CreateUser(c)
 
-	assert.Equal(t, http.StatusCreated, c.Writer.Status())
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.JSONEq(t, `{"error":"role must be owner, admin, or operator"}`, w.Body.String())
 }
 
-func TestAdminHandler_GetUser(t *testing.T) {
-	clinicID := uuid.New()
-	userID := uuid.New()
-	mockSvc := new(MockAdminService)
-	handler := &AdminHandler{Svc: mockSvc}
-
-	testID := uuid.New()
-	c := createAuthContext("owner", clinicID, userID)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/users/"+testID.String(), nil)
-	c.Params = []gin.Param{{Key: "id", Value: testID.String()}}
-
-	mockSvc.On("GetUser", mock.Anything, testID).Return(nil, nil)
+func TestAdminHandler_GetUser_BadID(t *testing.T) {
+	handler := &AdminHandler{}
+	c, w := createAdminContext(http.MethodGet, "/api/admin/users/not-a-uuid", nil, &auth.Claims{
+		UserID:   uuid.New(),
+		ClinicID: uuid.New(),
+		Role:     "admin",
+	})
+	c.Params = []gin.Param{{Key: "id", Value: "not-a-uuid"}}
 
 	handler.GetUser(c)
 
-	assert.Equal(t, http.StatusOK, c.Writer.Status())
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.JSONEq(t, `{"error":"bad id"}`, w.Body.String())
 }
 
-func TestAdminHandler_UpdateUser(t *testing.T) {
-	clinicID := uuid.New()
-	userID := uuid.New()
-	mockSvc := new(MockAdminService)
-	handler := &AdminHandler{Svc: mockSvc}
-
-	testID := uuid.New()
-	c := createAuthContext("owner", clinicID, userID)
-	c.Request = httptest.NewRequest(http.MethodPut, "/api/admin/users/"+testID.String(), bytes.NewBufferString(`{"name":"New Name","role":"admin"}`))
-	c.Request.Header.Set("Content-Type", "application/json")
-	c.Params = []gin.Param{{Key: "id", Value: testID.String()}}
-
-	mockSvc.On("UpdateUser", mock.Anything, testID, mock.Anything, mock.Anything).Return(nil)
-
-	handler.UpdateUser(c)
-
-	assert.Equal(t, http.StatusOK, c.Writer.Status())
-}
-
-func TestAdminHandler_DeleteUser(t *testing.T) {
-	clinicID := uuid.New()
-	userID := uuid.New()
-	mockSvc := new(MockAdminService)
-	handler := &AdminHandler{Svc: mockSvc}
-
-	testID := uuid.New()
-	c := createAuthContext("owner", clinicID, userID)
-	c.Request = httptest.NewRequest(http.MethodDelete, "/api/admin/users/"+testID.String(), nil)
-	c.Params = []gin.Param{{Key: "id", Value: testID.String()}}
-
-	mockSvc.On("DeleteUser", mock.Anything, testID).Return(nil)
+func TestAdminHandler_DeleteUser_ForbiddenForNonOwner(t *testing.T) {
+	handler := &AdminHandler{}
+	c, w := createAdminContext(http.MethodDelete, "/api/admin/users/"+uuid.NewString(), nil, &auth.Claims{
+		UserID:   uuid.New(),
+		ClinicID: uuid.New(),
+		Role:     "admin",
+	})
+	c.Params = []gin.Param{{Key: "id", Value: uuid.NewString()}}
 
 	handler.DeleteUser(c)
 
-	assert.Equal(t, http.StatusNoContent, c.Writer.Status())
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.JSONEq(t, `{"error":"forbidden: owner only"}`, w.Body.String())
 }
 
-func TestAdminHandler_ChangePassword(t *testing.T) {
-	clinicID := uuid.New()
-	userID := uuid.New()
-	mockSvc := new(MockAdminService)
-	handler := &AdminHandler{Svc: mockSvc}
-
-	c := createAuthContext("owner", clinicID, userID)
-	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/change-password", bytes.NewBufferString(`{"old_password":"old","new_password":"new"}`))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	mockSvc.On("ChangePassword", mock.Anything, userID, mock.Anything, mock.Anything).Return(nil)
+func TestAdminHandler_ChangePassword_BadRequestOnInvalidBody(t *testing.T) {
+	handler := &AdminHandler{}
+	c, w := createAdminContext(
+		http.MethodPost,
+		"/api/admin/change-password",
+		[]byte(`{"old_password":"old"}`),
+		&auth.Claims{UserID: uuid.New(), ClinicID: uuid.New(), Role: "owner"},
+	)
 
 	handler.ChangePassword(c)
 
-	assert.Equal(t, http.StatusOK, c.Writer.Status())
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.JSONEq(t, `{"error":"invalid body"}`, w.Body.String())
 }

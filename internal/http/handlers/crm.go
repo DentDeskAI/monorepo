@@ -10,13 +10,13 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dentdesk/dentdesk/internal/http/middleware"
-	"github.com/dentdesk/dentdesk/internal/patients"
 	"github.com/dentdesk/dentdesk/internal/services"
+	"github.com/dentdesk/dentdesk/internal/store"
 )
 
 type CRMHandler struct {
 	Svc      *services.CRMService
-	Patients *patients.Repo
+	Patients *store.PatientRepo
 }
 
 func (h *CRMHandler) ListChats(c *gin.Context) {

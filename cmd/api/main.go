@@ -21,23 +21,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dentdesk/dentdesk/internal/appointments"
 	"github.com/dentdesk/dentdesk/internal/auth"
-	"github.com/dentdesk/dentdesk/internal/chairs"
-	"github.com/dentdesk/dentdesk/internal/clinics"
-	"github.com/dentdesk/dentdesk/internal/conversations"
-	"github.com/dentdesk/dentdesk/internal/doctors"
 	httpx "github.com/dentdesk/dentdesk/internal/http"
 	"github.com/dentdesk/dentdesk/internal/http/handlers"
 	"github.com/dentdesk/dentdesk/internal/llm"
-	"github.com/dentdesk/dentdesk/internal/patients"
 	"github.com/dentdesk/dentdesk/internal/platform/config"
 	"github.com/dentdesk/dentdesk/internal/platform/db"
 	"github.com/dentdesk/dentdesk/internal/platform/logger"
 	redisx "github.com/dentdesk/dentdesk/internal/platform/redis"
 	"github.com/dentdesk/dentdesk/internal/realtime"
-	"github.com/dentdesk/dentdesk/internal/scheduler"
+	"github.com/dentdesk/dentdesk/internal/scheduling"
 	"github.com/dentdesk/dentdesk/internal/services"
+	"github.com/dentdesk/dentdesk/internal/store"
 	"github.com/dentdesk/dentdesk/internal/whatsapp"
 )
 
@@ -72,17 +67,17 @@ func main() {
 	defer redisClient.Close()
 
 	// --- Repositories ---
-	clinicsRepo := clinics.NewRepo(database)
-	chairsRepo := chairs.NewRepo(database)
-	patientsRepo := patients.NewRepo(database)
-	convRepo := conversations.NewRepo(database)
-	apptRepo := appointments.NewRepo(database)
-	doctorsRepo := doctors.NewRepo(database)
+	clinicsRepo := store.NewClinicRepo(database)
+	chairsRepo := store.NewChairRepo(database)
+	patientsRepo := store.NewPatientRepo(database)
+	convRepo := store.NewConversationRepo(database)
+	apptRepo := store.NewAppointmentRepo(database)
+	doctorsRepo := store.NewDoctorRepo(database)
 
 	// --- Scheduler ---
 	// Registry dispatches to the right backend (MacDent or Local) based on
-	// each clinic's scheduler_type column. Implements scheduler.Scheduler.
-	sched := scheduler.NewRegistry(
+	// each clinic's scheduler_type column. Implements scheduling.Scheduler.
+	sched := scheduling.NewRegistry(
 		database,
 		&http.Client{Timeout: 15 * time.Second},
 		clinicsRepo,
