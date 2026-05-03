@@ -1,4 +1,5 @@
 const BASE = import.meta.env.VITE_API_URL || "/api";
+const WA_WEB_BASE = import.meta.env.VITE_WA_WEB_URL || "/waweb/api";
 
 function getToken() {
   return localStorage.getItem("dd_token") || "";
@@ -27,6 +28,20 @@ async function request(path, { method = "GET", body } = {}) {
   }
   if (res.status === 204) return null;
   return res.json();
+}
+
+async function waWebRequest(path, { method = "GET", body } = {}) {
+  const res = await fetch(WA_WEB_BASE + path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `WhatsApp Web HTTP ${res.status}`);
+  }
+  return data;
 }
 
 export const api = {
@@ -106,6 +121,22 @@ export const api = {
     };
     return () => es.close();
   },
+};
+
+export const waWeb = {
+  status: () => waWebRequest("/status"),
+  qr: () => waWebRequest("/qr"),
+  chats: (limit = 80) => waWebRequest(`/chats?limit=${limit}`),
+  messages: (chatId, limit = 80) =>
+    waWebRequest(`/chats/${encodeURIComponent(chatId)}/messages?limit=${limit}`),
+  send: (chatId, body) =>
+    waWebRequest(`/chats/${encodeURIComponent(chatId)}/send`, {
+      method: "POST",
+      body: { body },
+    }),
+  logout: () => waWebRequest("/logout", { method: "POST" }),
+  resetSession: () => waWebRequest("/session/reset", { method: "POST" }),
+  eventsUrl: () => `${WA_WEB_BASE}/events`,
 };
 
 export function saveAuth({ token, user }) {

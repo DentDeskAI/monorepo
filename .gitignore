@@ -12,6 +12,7 @@
 # Node
 web/node_modules/
 web/dist/
+waweb/node_modules/
 
 # Docker volumes / OS
 .DS_Store
