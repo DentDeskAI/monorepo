@@ -30,12 +30,12 @@ export default function Layout() {
   const nav = useNavigate();
 
   const items = [
-    { to: "/", label: t(i18nKeys.layout.nav.dashboard), icon: "📊" },
-    { to: "/chats", label: t(i18nKeys.layout.nav.chats), icon: "💬" },
-    { to: "/calendar", label: t(i18nKeys.layout.nav.calendar), icon: "📅" },
-    { to: "/patients", label: t(i18nKeys.layout.nav.patients), icon: "👤" },
-    { to: "/doctors", label: t(i18nKeys.layout.nav.doctors), icon: "👨‍⚕️" },
-    { to: "/records", label: t(i18nKeys.layout.nav.records), icon: "📋" },
+    { to: "/app", label: t(i18nKeys.layout.nav.dashboard), icon: "📊" },
+    { to: "/app/chats", label: t(i18nKeys.layout.nav.chats), icon: "💬" },
+    { to: "/app/calendar", label: t(i18nKeys.layout.nav.calendar), icon: "📅" },
+    { to: "/app/patients", label: t(i18nKeys.layout.nav.patients), icon: "👤" },
+    { to: "/app/doctors", label: t(i18nKeys.layout.nav.doctors), icon: "👨‍⚕️" },
+    { to: "/app/records", label: t(i18nKeys.layout.nav.records), icon: "📋" },
   ];
 
   const onLogout = () => {
@@ -77,7 +77,7 @@ export default function Layout() {
                 <NavLink
                     key={it.to}
                     to={it.to}
-                    end={it.to === "/"}
+                    end={it.to === "/app"}
                     className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                             isActive

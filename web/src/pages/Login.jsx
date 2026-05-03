@@ -34,7 +34,7 @@ export default function Login() {
     try {
       const { token, user } = await api.login(email, password);
       saveAuth({ token, user });
-      nav("/");
+      nav("/app");
     } catch (e) {
       setErr(t(i18nKeys.login.error));
     } finally {
