@@ -1,0 +1,24 @@
+FROM ghcr.io/puppeteer/puppeteer:latest
+
+ENV NODE_ENV=production
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+ENV WA_WEB_AUTH_DIR=/data
+
+USER root
+
+WORKDIR /app
+
+COPY waweb/package*.json ./
+RUN npm install --no-audit --no-fund
+
+COPY waweb/ ./
+
+RUN mkdir -p /data \
+  && chown -R pptruser:pptruser /app /data
+
+USER pptruser
+
+EXPOSE 3000
+
+CMD ["npm", "start"]

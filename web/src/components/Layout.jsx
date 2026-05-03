@@ -32,6 +32,7 @@ export default function Layout() {
   const items = [
     { to: "/", label: t(i18nKeys.layout.nav.dashboard), icon: "📊" },
     { to: "/chats", label: t(i18nKeys.layout.nav.chats), icon: "💬" },
+    { to: "/whatsapp-web", label: "WhatsApp Web", icon: "WA" },
     { to: "/calendar", label: t(i18nKeys.layout.nav.calendar), icon: "📅" },
     { to: "/patients", label: t(i18nKeys.layout.nav.patients), icon: "👤" },
     { to: "/doctors", label: t(i18nKeys.layout.nav.doctors), icon: "👨‍⚕️" },

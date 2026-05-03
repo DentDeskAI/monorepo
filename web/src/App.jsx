@@ -8,6 +8,7 @@ import Patients from "./pages/Patients";
 import { getUser } from "./api/client";
 import Doctors from "./pages/Doctors.jsx";
 import RecordsTable from "./pages/RecordsTable";
+import WhatsAppWeb from "./pages/WhatsAppWeb";
 
 function Protected({ children }) {
   const user = getUser();
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="patients" element={<Patients />} />
           <Route path="doctors" element={<Doctors />} />
           <Route path="records" element={<RecordsTable />} />
+          <Route path="whatsapp-web" element={<WhatsAppWeb />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
