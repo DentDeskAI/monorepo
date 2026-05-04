@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dentdesk/dentdesk/internal/http/middleware"
+	"github.com/dentdesk/dentdesk/internal/patients"
 	"github.com/dentdesk/dentdesk/internal/services"
 	"github.com/dentdesk/dentdesk/internal/store"
 )

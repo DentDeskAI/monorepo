@@ -1,3 +1,6 @@
+import { mockApi } from "./mock";
+
+const MOCK = import.meta.env.VITE_MOCK === "true";
 const BASE = import.meta.env.VITE_API_URL || "/api";
 const WA_WEB_BASE = import.meta.env.VITE_WA_WEB_URL || "/waweb/api";
 
