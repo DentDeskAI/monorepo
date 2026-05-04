@@ -18,3 +18,5 @@ web/dist/
 .claude/
 
 s.sh
+
+.continue/

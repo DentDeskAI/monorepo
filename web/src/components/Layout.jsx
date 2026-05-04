@@ -34,6 +34,7 @@ export default function Layout() {
     { to: "/chats", label: t(i18nKeys.layout.nav.chats), icon: "💬" },
     { to: "/calendar", label: t(i18nKeys.layout.nav.calendar), icon: "📅" },
     { to: "/patients", label: t(i18nKeys.layout.nav.patients), icon: "👤" },
+    { to: "/whatsapp-web", label: "WhatsApp Web", icon: "WA" },
     { to: "/doctors", label: t(i18nKeys.layout.nav.doctors), icon: "👨‍⚕️" },
     { to: "/records", label: t(i18nKeys.layout.nav.records), icon: "📋" },
   ];
