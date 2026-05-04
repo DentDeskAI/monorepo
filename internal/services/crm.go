@@ -9,20 +9,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/dentdesk/dentdesk/internal/appointments"
-	"github.com/dentdesk/dentdesk/internal/conversations"
-	"github.com/dentdesk/dentdesk/internal/doctors"
-	"github.com/dentdesk/dentdesk/internal/patients"
 	"github.com/dentdesk/dentdesk/internal/realtime"
+	"github.com/dentdesk/dentdesk/internal/store"
 	"github.com/dentdesk/dentdesk/internal/whatsapp"
 )
 
 var ErrConversationNotFound = errors.New("conversation not found")
 
 type ChatListRow struct {
-	Conversation conversations.Conversation `json:"conversation"`
-	Patient      *patients.Patient          `json:"patient"`
-	LastMessage  *conversations.Message     `json:"last_message,omitempty"`
+	Conversation store.Conversation `json:"conversation"`
+	Patient      *store.Patient     `json:"patient"`
+	LastMessage  *store.Message     `json:"last_message,omitempty"`
 }
 
 type Stats struct {
@@ -33,15 +30,15 @@ type Stats struct {
 
 type CRMService struct {
 	DB            *sqlx.DB
-	Patients      *patients.Repo
-	Conversations *conversations.Repo
-	Appointments  *appointments.Repo
-	Doctors       *doctors.Repo
+	Patients      *store.PatientRepo
+	Conversations *store.ConversationRepo
+	Appointments  *store.AppointmentRepo
+	Doctors       *store.DoctorRepo
 	Hub           *realtime.Hub
 	WhatsApp      *whatsapp.Client
 }
 
-func NewCRMService(db *sqlx.DB, patientsRepo *patients.Repo, convRepo *conversations.Repo, apptRepo *appointments.Repo, doctorsRepo *doctors.Repo, hub *realtime.Hub, wa *whatsapp.Client) *CRMService {
+func NewCRMService(db *sqlx.DB, patientsRepo *store.PatientRepo, convRepo *store.ConversationRepo, apptRepo *store.AppointmentRepo, doctorsRepo *store.DoctorRepo, hub *realtime.Hub, wa *whatsapp.Client) *CRMService {
 	return &CRMService{
 		DB:            db,
 		Patients:      patientsRepo,
@@ -62,7 +59,7 @@ func (s *CRMService) ListChats(ctx context.Context, clinicID uuid.UUID) ([]ChatL
 	for _, conv := range convs {
 		p, _ := s.Patients.Get(ctx, conv.PatientID)
 		msgs, _ := s.Conversations.ListMessages(ctx, conv.ID, 1)
-		var last *conversations.Message
+		var last *store.Message
 		if len(msgs) > 0 {
 			last = &msgs[0]
 		}
@@ -71,13 +68,13 @@ func (s *CRMService) ListChats(ctx context.Context, clinicID uuid.UUID) ([]ChatL
 	return out, nil
 }
 
-func (s *CRMService) ListMessages(ctx context.Context, conversationID uuid.UUID) ([]conversations.Message, error) {
+func (s *CRMService) ListMessages(ctx context.Context, conversationID uuid.UUID) ([]store.Message, error) {
 	return s.Conversations.RecentHistory(ctx, conversationID, 200)
 }
 
-func (s *CRMService) OperatorSend(ctx context.Context, clinicID, operatorID, conversationID uuid.UUID, body string) (*conversations.Message, error) {
+func (s *CRMService) OperatorSend(ctx context.Context, clinicID, operatorID, conversationID uuid.UUID, body string) (*store.Message, error) {
 	convs, _ := s.Conversations.ListForClinic(ctx, clinicID, 500)
-	var conv *conversations.Conversation
+	var conv *store.Conversation
 	for i := range convs {
 		if convs[i].ID == conversationID {
 			conv = &convs[i]
@@ -93,7 +90,7 @@ func (s *CRMService) OperatorSend(ctx context.Context, clinicID, operatorID, con
 	}
 
 	meta, _ := json.Marshal(map[string]any{"operator_id": operatorID})
-	msg, _, err := s.Conversations.InsertMessage(ctx, &conversations.Message{
+	msg, _, err := s.Conversations.InsertMessage(ctx, &store.Message{
 		ConversationID: conversationID,
 		Direction:      "outbound",
 		Sender:         "operator",
@@ -119,15 +116,15 @@ func (s *CRMService) ReleaseHandoff(ctx context.Context, conversationID uuid.UUI
 	return s.Conversations.SetStatus(ctx, conversationID, "active")
 }
 
-func (s *CRMService) ListPatients(ctx context.Context, clinicID uuid.UUID) ([]patients.Patient, error) {
+func (s *CRMService) ListPatients(ctx context.Context, clinicID uuid.UUID) ([]store.Patient, error) {
 	return s.Patients.List(ctx, clinicID, 200)
 }
 
-func (s *CRMService) PatientAppointments(ctx context.Context, patientID uuid.UUID) ([]appointments.Appointment, error) {
+func (s *CRMService) PatientAppointments(ctx context.Context, patientID uuid.UUID) ([]store.Appointment, error) {
 	return s.Appointments.ListForPatient(ctx, patientID)
 }
 
-func (s *CRMService) Calendar(ctx context.Context, clinicID uuid.UUID, from, to *time.Time) ([]appointments.Appointment, error) {
+func (s *CRMService) Calendar(ctx context.Context, clinicID uuid.UUID, from, to *time.Time) ([]store.Appointment, error) {
 	start := time.Now().Add(-24 * time.Hour)
 	end := time.Now().Add(7 * 24 * time.Hour)
 	if from != nil && to != nil {
@@ -137,7 +134,7 @@ func (s *CRMService) Calendar(ctx context.Context, clinicID uuid.UUID, from, to 
 	return s.Appointments.ListForPeriod(ctx, clinicID, start, end)
 }
 
-func (s *CRMService) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]doctors.Doctor, error) {
+func (s *CRMService) ListDoctors(ctx context.Context, clinicID uuid.UUID) ([]store.Doctor, error) {
 	return s.Doctors.List(ctx, clinicID)
 }
 

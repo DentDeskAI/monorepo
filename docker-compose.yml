@@ -45,6 +45,20 @@ services:
       postgres:
         condition: service_healthy
 
+  waweb:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.waweb
+    platform: ${WAWEB_PLATFORM:-linux/amd64}
+    ports:
+      - "${WAWEB_PORT:-3001}:3000"
+    environment:
+      WA_WEB_AUTH_DIR: /data
+      WA_WEB_CLIENT_ID: dentdesk-session
+    volumes:
+      - wawebdata:/data
+    shm_size: "1gb"
+
   web:
     build:
       context: .
@@ -53,6 +67,8 @@ services:
       - "${WEB_PORT}:80"
     depends_on:
       - api
+      - waweb
 
 volumes:
   pgdata:
+  wawebdata:

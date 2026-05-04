@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/dentdesk/dentdesk/internal/http/middleware"
-	"github.com/dentdesk/dentdesk/internal/scheduler"
+	"github.com/dentdesk/dentdesk/internal/scheduling"
 )
 
 // Scheduler appointment status codes.
@@ -23,7 +23,7 @@ const (
 )
 
 type DashboardHandler struct {
-	Sched scheduler.Scheduler
+	Sched scheduling.Scheduler
 }
 
 // ── /api/dashboard/today ─────────────────────────────────────────────────────

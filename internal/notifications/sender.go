@@ -9,7 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog"
 
-	"github.com/dentdesk/dentdesk/internal/appointments"
+	"github.com/dentdesk/dentdesk/internal/store"
 	"github.com/dentdesk/dentdesk/internal/whatsapp"
 )
 
@@ -17,7 +17,7 @@ type Sender struct {
 	DB       *sqlx.DB
 	Log      zerolog.Logger
 	WhatsApp *whatsapp.Client
-	Repo     *appointments.Repo
+	Repo     *store.AppointmentRepo
 }
 
 func (s *Sender) RunTick(ctx context.Context) {
@@ -86,7 +86,7 @@ func (s *Sender) sendFollowup(ctx context.Context, now time.Time) {
 	}
 }
 
-func format24h(a appointments.Appointment) string {
+func format24h(a store.Appointment) string {
 	doc := "врача"
 	if a.DoctorName != nil {
 		doc = "врача " + *a.DoctorName
@@ -97,7 +97,7 @@ func format24h(a appointments.Appointment) string {
 	)
 }
 
-func format2h(a appointments.Appointment) string {
+func format2h(a store.Appointment) string {
 	return fmt.Sprintf(
 		"Ждём вас сегодня в %02d:%02d 🙂 Если планы изменились — дайте знать.",
 		a.StartsAt.Hour(), a.StartsAt.Minute(),

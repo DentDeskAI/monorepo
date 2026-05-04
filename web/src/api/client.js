@@ -2,6 +2,7 @@ import { mockApi } from "./mock";
 
 const MOCK = import.meta.env.VITE_MOCK === "true";
 const BASE = import.meta.env.VITE_API_URL || "/api";
+const WA_WEB_BASE = import.meta.env.VITE_WA_WEB_URL || "/waweb/api";
 
 function getToken() {
   return localStorage.getItem("dd_token") || "";
@@ -32,10 +33,24 @@ async function request(path, { method = "GET", body } = {}) {
   return res.json();
 }
 
-export const api = MOCK ? mockApi : {
+async function waWebRequest(path, { method = "GET", body } = {}) {
+  const res = await fetch(WA_WEB_BASE + path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `WhatsApp Web HTTP ${res.status}`);
+  }
+  return data;
+}
+
+export const api = {
   // auth
   login: (email, password) =>
-    request("/auth/login", { method: "POST", body: { email, password } }),
+      request("/auth/login", { method: "POST", body: { email, password } }),
   me: () => request("/auth/me"),
 
   // chats
@@ -46,7 +61,7 @@ export const api = MOCK ? mockApi : {
 
   // calendar
   calendar: (from, to) =>
-    request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+      request(`/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   scheduleDoctors: () => request("/schedule/doctors"),
 
   // history = record table
@@ -56,24 +71,24 @@ export const api = MOCK ? mockApi : {
   // schedule — MacDent live data
   scheduleDoctors: (from, to) => {
     const q = from && to
-      ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-      : "";
+        ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+        : "";
     return request(`/schedule/doctors${q}`);
   },
   scheduleAppointment: (id) => request(`/schedule/appointments/${id}`),
   updateScheduleAppointment: (id, body) =>
-    request(`/schedule/appointments/${id}`, { method: "PUT", body }),
+      request(`/schedule/appointments/${id}`, { method: "PUT", body }),
   deleteScheduleAppointment: (id) =>
-    request(`/schedule/appointments/${id}`, { method: "DELETE" }),
+      request(`/schedule/appointments/${id}`, { method: "DELETE" }),
   schedulePatient: (id) => request(`/schedule/patients/${id}`),
   sendAppointmentRequest: (body) =>
-    request("/schedule/appointment-requests", { method: "POST", body }),
+      request("/schedule/appointment-requests", { method: "POST", body }),
   createSchedulePatient: (body) =>
-    request("/schedule/patients", { method: "POST", body }),
+      request("/schedule/patients", { method: "POST", body }),
   createScheduleAppointment: (body) =>
-    request("/schedule/appointments", { method: "POST", body }),
+      request("/schedule/appointments", { method: "POST", body }),
   setScheduleAppointmentStatus: (id, status) =>
-    request(`/schedule/appointments/${id}/status`, { method: "PUT", body: { status } }),
+      request(`/schedule/appointments/${id}/status`, { method: "PUT", body: { status } }),
 
   // doctors
   doctors: () => request("/doctors"),
@@ -93,9 +108,9 @@ export const api = MOCK ? mockApi : {
   // dashboard analytics
   dashboardToday: () => request("/dashboard/today"),
   dashboardStats: (from, to) =>
-    request(`/dashboard/stats?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+      request(`/dashboard/stats?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   dashboardRevenue: (from, to) =>
-    request(`/dashboard/revenue?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+      request(`/dashboard/revenue?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
 
   // SSE
   subscribe: (onEvent) => {
@@ -109,6 +124,22 @@ export const api = MOCK ? mockApi : {
     };
     return () => es.close();
   },
+};
+
+export const waWeb = {
+  status: () => waWebRequest("/status"),
+  qr: () => waWebRequest("/qr"),
+  chats: (limit = 80) => waWebRequest(`/chats?limit=${limit}`),
+  messages: (chatId, limit = 80) =>
+      waWebRequest(`/chats/${encodeURIComponent(chatId)}/messages?limit=${limit}`),
+  send: (chatId, body) =>
+      waWebRequest(`/chats/${encodeURIComponent(chatId)}/send`, {
+        method: "POST",
+        body: { body },
+      }),
+  logout: () => waWebRequest("/logout", { method: "POST" }),
+  resetSession: () => waWebRequest("/session/reset", { method: "POST" }),
+  eventsUrl: () => `${WA_WEB_BASE}/events`,
 };
 
 export function saveAuth({ token, user }) {

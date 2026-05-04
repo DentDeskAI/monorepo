@@ -1,0 +1,34 @@
+# VCS
+.git
+.gitignore
+.github/
+
+# Local IDE/tooling
+.continue/
+.claude/
+.idea/
+.vscode/
+
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+out/
+coverage/
+*.log
+*.tmp
+
+# OS files
+.DS_Store
+
+# Node artifacts
+node_modules/
+web/node_modules/
+web/dist/
+waweb/node_modules/
+
+# Local binaries
+api
+worker

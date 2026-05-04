@@ -1,4 +1,4 @@
-package appointments
+package store
 
 import (
 	"context"
@@ -22,7 +22,7 @@ type Appointment struct {
 	Source     string     `db:"source" json:"source"`
 	CreatedAt  time.Time  `db:"created_at" json:"created_at"`
 	SeqID      int        `db:"seq_id" json:"seq_id"`
-	// Опциональные join-поля для UI
+	// Optional join fields for UI
 	PatientName  *string `db:"patient_name" json:"patient_name,omitempty"`
 	PatientPhone *string `db:"patient_phone" json:"patient_phone,omitempty"`
 	DoctorName   *string `db:"doctor_name" json:"doctor_name,omitempty"`
@@ -31,19 +31,18 @@ type Appointment struct {
 	DoctorSeqID  *int `db:"doctor_seq_id" json:"-"`
 }
 
-type UpdateFields struct {
+type AppointmentUpdateFields struct {
 	DoctorID *uuid.UUID
 	StartsAt *time.Time
 	EndsAt   *time.Time
 	Service  *string
 }
 
-type Repo struct{ db *sqlx.DB }
+type AppointmentRepo struct{ db *sqlx.DB }
 
-func NewRepo(db *sqlx.DB) *Repo { return &Repo{db: db} }
+func NewAppointmentRepo(db *sqlx.DB) *AppointmentRepo { return &AppointmentRepo{db: db} }
 
-// ListForPeriod — для календаря CRM.
-func (r *Repo) ListForPeriod(ctx context.Context, clinicID uuid.UUID, from, to time.Time) ([]Appointment, error) {
+func (r *AppointmentRepo) ListForPeriod(ctx context.Context, clinicID uuid.UUID, from, to time.Time) ([]Appointment, error) {
 	var out []Appointment
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT a.id, a.clinic_id, a.patient_id, a.doctor_id, a.chair_id, a.external_id,
@@ -62,7 +61,7 @@ func (r *Repo) ListForPeriod(ctx context.Context, clinicID uuid.UUID, from, to t
 	return out, err
 }
 
-func (r *Repo) ListForPatient(ctx context.Context, patientID uuid.UUID) ([]Appointment, error) {
+func (r *AppointmentRepo) ListForPatient(ctx context.Context, patientID uuid.UUID) ([]Appointment, error) {
 	var out []Appointment
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT a.id, a.clinic_id, a.patient_id, a.doctor_id, a.chair_id, a.external_id,
@@ -74,7 +73,7 @@ func (r *Repo) ListForPatient(ctx context.Context, patientID uuid.UUID) ([]Appoi
 	return out, err
 }
 
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Appointment, error) {
+func (r *AppointmentRepo) Get(ctx context.Context, id uuid.UUID) (*Appointment, error) {
 	var a Appointment
 	err := r.db.GetContext(ctx, &a,
 		`SELECT a.id, a.clinic_id, a.patient_id, a.doctor_id, a.chair_id, a.external_id,
@@ -91,10 +90,8 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (*Appointment, error) {
 	return &a, nil
 }
 
-// DueForReminder24h — для worker'а: записи через ~24ч, без напоминания.
-func (r *Repo) DueForReminder24h(ctx context.Context, now time.Time) ([]Appointment, error) {
+func (r *AppointmentRepo) DueForReminder24h(ctx context.Context, now time.Time) ([]Appointment, error) {
 	var out []Appointment
-	// окно 23ч30м..24ч30м от now
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT a.id, a.clinic_id, a.patient_id, a.doctor_id, a.chair_id, a.external_id,
 		        a.starts_at, a.ends_at, a.service, a.status, a.source, a.created_at, a.seq_id,
@@ -112,8 +109,7 @@ func (r *Repo) DueForReminder24h(ctx context.Context, now time.Time) ([]Appointm
 	return out, err
 }
 
-// DueForReminder2h — записи через ~2ч.
-func (r *Repo) DueForReminder2h(ctx context.Context, now time.Time) ([]Appointment, error) {
+func (r *AppointmentRepo) DueForReminder2h(ctx context.Context, now time.Time) ([]Appointment, error) {
 	var out []Appointment
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT a.id, a.clinic_id, a.patient_id, a.doctor_id, a.chair_id, a.external_id,
@@ -132,8 +128,7 @@ func (r *Repo) DueForReminder2h(ctx context.Context, now time.Time) ([]Appointme
 	return out, err
 }
 
-// DueForFollowup — visited today/yesterday без follow-up.
-func (r *Repo) DueForFollowup(ctx context.Context, now time.Time) ([]Appointment, error) {
+func (r *AppointmentRepo) DueForFollowup(ctx context.Context, now time.Time) ([]Appointment, error) {
 	var out []Appointment
 	err := r.db.SelectContext(ctx, &out,
 		`SELECT a.id, a.clinic_id, a.patient_id, a.doctor_id, a.chair_id, a.external_id,
@@ -151,29 +146,31 @@ func (r *Repo) DueForFollowup(ctx context.Context, now time.Time) ([]Appointment
 	return out, err
 }
 
-func (r *Repo) MarkReminder24hSent(ctx context.Context, id uuid.UUID) error {
+func (r *AppointmentRepo) MarkReminder24hSent(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE appointments SET reminder_24h_sent_at=NOW() WHERE id=$1`, id)
 	return err
 }
-func (r *Repo) MarkReminder2hSent(ctx context.Context, id uuid.UUID) error {
+
+func (r *AppointmentRepo) MarkReminder2hSent(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE appointments SET reminder_2h_sent_at=NOW() WHERE id=$1`, id)
 	return err
 }
-func (r *Repo) MarkFollowupSent(ctx context.Context, id uuid.UUID) error {
+
+func (r *AppointmentRepo) MarkFollowupSent(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE appointments SET followup_sent_at=NOW() WHERE id=$1`, id)
 	return err
 }
 
-func (r *Repo) SetStatus(ctx context.Context, id uuid.UUID, status string) error {
+func (r *AppointmentRepo) SetStatus(ctx context.Context, id uuid.UUID, status string) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE appointments SET status=$1 WHERE id=$2`, status, id)
 	return err
 }
 
-func (r *Repo) Create(ctx context.Context, a *Appointment) (*Appointment, error) {
+func (r *AppointmentRepo) Create(ctx context.Context, a *Appointment) (*Appointment, error) {
 	var out Appointment
 	err := r.db.GetContext(ctx, &out,
 		`INSERT INTO appointments
@@ -186,7 +183,7 @@ func (r *Repo) Create(ctx context.Context, a *Appointment) (*Appointment, error)
 	return &out, err
 }
 
-func (r *Repo) GetBySeqID(ctx context.Context, clinicID uuid.UUID, seqID int) (*Appointment, error) {
+func (r *AppointmentRepo) GetBySeqID(ctx context.Context, clinicID uuid.UUID, seqID int) (*Appointment, error) {
 	var a Appointment
 	err := r.db.GetContext(ctx, &a,
 		`SELECT a.id, a.clinic_id, a.patient_id, a.doctor_id, a.chair_id, a.external_id,
@@ -203,12 +200,12 @@ func (r *Repo) GetBySeqID(ctx context.Context, clinicID uuid.UUID, seqID int) (*
 	return &a, nil
 }
 
-func (r *Repo) Delete(ctx context.Context, id uuid.UUID) error {
+func (r *AppointmentRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM appointments WHERE id=$1`, id)
 	return err
 }
 
-func (r *Repo) UpdateFields(ctx context.Context, id uuid.UUID, f UpdateFields) error {
+func (r *AppointmentRepo) UpdateFields(ctx context.Context, id uuid.UUID, f AppointmentUpdateFields) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE appointments
 		 SET doctor_id = COALESCE($1, doctor_id),
