@@ -6,19 +6,19 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dentdesk/dentdesk/internal/auth"
-	"github.com/dentdesk/dentdesk/internal/clinics"
+	"github.com/dentdesk/dentdesk/internal/store"
 )
 
 type AdminService struct {
 	Auth    *auth.Service
-	Clinics *clinics.Repo
+	Clinics *store.ClinicRepo
 }
 
-func NewAdminService(authSvc *auth.Service, clinicsRepo *clinics.Repo) *AdminService {
+func NewAdminService(authSvc *auth.Service, clinicsRepo *store.ClinicRepo) *AdminService {
 	return &AdminService{Auth: authSvc, Clinics: clinicsRepo}
 }
 
-func (s *AdminService) Register(ctx context.Context, clinicName, timezone, ownerName, email, password string) (*clinics.Clinic, *auth.User, string, error) {
+func (s *AdminService) Register(ctx context.Context, clinicName, timezone, ownerName, email, password string) (*store.Clinic, *auth.User, string, error) {
 	clinic, err := s.Clinics.Create(ctx, clinicName, timezone, "local")
 	if err != nil {
 		return nil, nil, "", err
@@ -34,11 +34,11 @@ func (s *AdminService) Register(ctx context.Context, clinicName, timezone, owner
 	return clinic, user, token, nil
 }
 
-func (s *AdminService) GetClinic(ctx context.Context, clinicID uuid.UUID) (*clinics.Clinic, error) {
+func (s *AdminService) GetClinic(ctx context.Context, clinicID uuid.UUID) (*store.Clinic, error) {
 	return s.Clinics.Get(ctx, clinicID)
 }
 
-func (s *AdminService) UpdateClinic(ctx context.Context, clinicID uuid.UUID, reqName, reqTimezone, reqWorkingHours, reqSchedulerType string, reqSlotDuration int) (*clinics.Clinic, error) {
+func (s *AdminService) UpdateClinic(ctx context.Context, clinicID uuid.UUID, reqName, reqTimezone, reqWorkingHours, reqSchedulerType string, reqSlotDuration int) (*store.Clinic, error) {
 	dur := reqSlotDuration
 	if dur == 0 {
 		dur = 30
@@ -52,7 +52,7 @@ func (s *AdminService) UpdateClinic(ctx context.Context, clinicID uuid.UUID, req
 		wh = `{"mon":["09:00","20:00"],"tue":["09:00","20:00"],"wed":["09:00","20:00"],"thu":["09:00","20:00"],"fri":["09:00","20:00"],"sat":["10:00","18:00"],"sun":null}`
 	}
 
-	if err := s.Clinics.Update(ctx, clinicID, clinics.UpdateFields{
+	if err := s.Clinics.Update(ctx, clinicID, store.ClinicUpdateFields{
 		Name: reqName, Timezone: reqTimezone,
 		WorkingHours: []byte(wh), SlotDurationMin: dur, SchedulerType: sched,
 	}); err != nil {

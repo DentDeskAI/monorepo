@@ -1,4 +1,4 @@
-package scheduler
+package scheduling
 
 import (
 	"encoding/json"
@@ -24,7 +24,6 @@ func parseWorkingHours(raw json.RawMessage) map[string]*dayHours {
 		return result
 	}
 
-	// Unmarshal as map of raw values so we can handle null and arrays.
 	var raw2 map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &raw2); err != nil {
 		return result
@@ -35,13 +34,11 @@ func parseWorkingHours(raw json.RawMessage) map[string]*dayHours {
 			result[day] = nil
 			continue
 		}
-		// Try array form: ["09:00","19:00"]
 		var arr []string
 		if err := json.Unmarshal(v, &arr); err == nil && len(arr) == 2 {
 			result[day] = &dayHours{Open: arr[0], Close: arr[1]}
 			continue
 		}
-		// Try object form: {"open":"09:00","close":"19:00"}
 		var obj struct {
 			Open  string `json:"open"`
 			Close string `json:"close"`

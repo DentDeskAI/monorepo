@@ -11,11 +11,10 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog"
 
-	"github.com/dentdesk/dentdesk/internal/conversations"
 	"github.com/dentdesk/dentdesk/internal/llm"
-	"github.com/dentdesk/dentdesk/internal/patients"
 	"github.com/dentdesk/dentdesk/internal/realtime"
-	"github.com/dentdesk/dentdesk/internal/scheduler"
+	"github.com/dentdesk/dentdesk/internal/scheduling"
+	"github.com/dentdesk/dentdesk/internal/store"
 	"github.com/dentdesk/dentdesk/internal/whatsapp"
 )
 
@@ -25,10 +24,10 @@ type WhatsAppHandler struct {
 	Log           zerolog.Logger
 	VerifyToken   string
 	WhatsApp      *whatsapp.Client
-	Patients      *patients.Repo
-	Conversations *conversations.Repo
+	Patients      *store.PatientRepo
+	Conversations *store.ConversationRepo
 	Orchestrator  *llm.Orchestrator
-	Scheduler     scheduler.Scheduler
+	Scheduler     scheduling.Scheduler
 	Hub           *realtime.Hub
 }
 
@@ -64,15 +63,14 @@ func (h *WhatsAppHandler) Receive(c *gin.Context) {
 	var payload whatsapp.WebhookPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		h.Log.Warn().Err(err).Msg("bad webhook payload")
-		c.Status(http.StatusOK) // Meta будет ретраить на 4xx, не хотим
+		c.Status(http.StatusOK)
 		return
 	}
-	// Отвечаем Meta сразу — обработку делаем асинхронно (с отдельным контекстом).
 	c.Status(http.StatusOK)
 
 	items := payload.Extract()
 	for _, m := range items {
-		msg := m // capture
+		msg := m
 		go h.process(msg)
 	}
 }
@@ -81,7 +79,7 @@ func (h *WhatsAppHandler) process(m whatsapp.Extracted) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// 1) Дедуп: SETNX по message_id в Redis на 10 минут.
+	// 1) Dedup: SETNX by message_id in Redis for 10 minutes.
 	dedupKey := "wa:msg:" + m.MessageID
 	ok, err := h.Redis.SetNX(ctx, dedupKey, "1", 10*time.Minute).Result()
 	if err == nil && !ok {
@@ -89,14 +87,13 @@ func (h *WhatsAppHandler) process(m whatsapp.Extracted) {
 		return
 	}
 
-	// 2) Находим клинику по phone_number_id.
+	// 2) Find clinic by phone_number_id.
 	type clinicRow struct {
 		ID string `db:"id"`
 	}
 	var row clinicRow
 	if err := h.DB.GetContext(ctx, &row,
 		`SELECT id FROM clinics WHERE whatsapp_phone_id=$1`, m.PhoneNumberID); err != nil {
-		// fallback: единственная клиника (MVP)
 		if err := h.DB.GetContext(ctx, &row,
 			`SELECT id FROM clinics ORDER BY created_at LIMIT 1`); err != nil {
 			h.Log.Error().Err(err).Msg("no clinic for message")
@@ -105,7 +102,7 @@ func (h *WhatsAppHandler) process(m whatsapp.Extracted) {
 	}
 	clinicID, _ := parseUUID(row.ID)
 
-	// 3) Пациент + диалог.
+	// 3) Patient + conversation.
 	patient, err := h.Patients.GetOrCreateByPhone(ctx, clinicID, m.From)
 	if err != nil {
 		h.Log.Error().Err(err).Msg("patient upsert")
@@ -121,9 +118,9 @@ func (h *WhatsAppHandler) process(m whatsapp.Extracted) {
 		return
 	}
 
-	// 4) Сохраняем входящее сообщение (идемпотентно).
+	// 4) Store incoming message (idempotent).
 	wamsgID := m.MessageID
-	stored, isNew, err := h.Conversations.InsertMessage(ctx, &conversations.Message{
+	stored, isNew, err := h.Conversations.InsertMessage(ctx, &store.Message{
 		ConversationID: conv.ID,
 		WAMessageID:    &wamsgID,
 		Direction:      "inbound",
@@ -140,14 +137,13 @@ func (h *WhatsAppHandler) process(m whatsapp.Extracted) {
 	}
 	h.Hub.Publish(clinicID, "message", stored)
 
-	// 5) Если диалог в handoff — бот молчит, оператор разберётся.
+	// 5) If conversation is in handoff — bot stays silent, operator handles it.
 	if conv.Status == "handoff" {
 		return
 	}
 
-	// 6) Оркестрация LLM.
+	// 6) LLM orchestration.
 	history, _ := h.Conversations.RecentHistory(ctx, conv.ID, 12)
-	// Убираем последнее inbound (оно уже передаётся отдельно в orchestrator как incoming).
 	if n := len(history); n > 0 && history[n-1].ID == stored.ID {
 		history = history[:n-1]
 	}
@@ -160,13 +156,13 @@ func (h *WhatsAppHandler) process(m whatsapp.Extracted) {
 		return
 	}
 
-	// 7) Сохраняем новый state.
+	// 7) Persist new state.
 	stateBytes, _ := json.Marshal(reply.NewState)
 	if err := h.Conversations.UpdateContext(ctx, conv.ID, stateBytes); err != nil {
 		h.Log.Warn().Err(err).Msg("update context")
 	}
 
-	// 8) Сохраняем outbound сообщение.
+	// 8) Store outbound message.
 	outMeta := map[string]any{}
 	if reply.Meta != nil {
 		outMeta = reply.Meta
@@ -174,7 +170,7 @@ func (h *WhatsAppHandler) process(m whatsapp.Extracted) {
 	outMeta["action"] = reply.ActionTaken
 	metaB, _ := json.Marshal(outMeta)
 
-	outMsg, _, err := h.Conversations.InsertMessage(ctx, &conversations.Message{
+	outMsg, _, err := h.Conversations.InsertMessage(ctx, &store.Message{
 		ConversationID: conv.ID,
 		Direction:      "outbound",
 		Sender:         "bot",
@@ -187,12 +183,12 @@ func (h *WhatsAppHandler) process(m whatsapp.Extracted) {
 		h.Hub.Publish(clinicID, "message", outMsg)
 	}
 
-	// 9) Отправляем в WhatsApp.
+	// 9) Send via WhatsApp.
 	if err := h.WhatsApp.SendText(ctx, m.From, reply.Text); err != nil {
 		h.Log.Error().Err(err).Msg("whatsapp send")
 	}
 
-	// 10) Если создали запись — паблишим событие.
+	// 10) Publish appointment event if one was created.
 	if reply.Appointment != nil {
 		h.Hub.Publish(clinicID, "appointment", map[string]any{
 			"id":         reply.Appointment.AppointmentID,

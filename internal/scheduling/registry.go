@@ -1,4 +1,4 @@
-package scheduler
+package scheduling
 
 import (
 	"context"
@@ -10,10 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/dentdesk/dentdesk/internal/appointments"
-	"github.com/dentdesk/dentdesk/internal/clinics"
-	"github.com/dentdesk/dentdesk/internal/doctors"
-	"github.com/dentdesk/dentdesk/internal/patients"
+	"github.com/dentdesk/dentdesk/internal/store"
 )
 
 // Registry is the top-level Scheduler implementation.
@@ -22,10 +19,10 @@ import (
 type Registry struct {
 	db        *sqlx.DB
 	httpCl    *http.Client
-	clinicsR  *clinics.Repo
-	doctorsR  *doctors.Repo
-	patientsR *patients.Repo
-	apptR     *appointments.Repo
+	clinicsR  *store.ClinicRepo
+	doctorsR  *store.DoctorRepo
+	patientsR *store.PatientRepo
+	apptR     *store.AppointmentRepo
 
 	mu    sync.RWMutex
 	cache map[uuid.UUID]Scheduler
@@ -35,10 +32,10 @@ type Registry struct {
 func NewRegistry(
 	db *sqlx.DB,
 	httpCl *http.Client,
-	clinicsR *clinics.Repo,
-	doctorsR *doctors.Repo,
-	patientsR *patients.Repo,
-	apptR *appointments.Repo,
+	clinicsR *store.ClinicRepo,
+	doctorsR *store.DoctorRepo,
+	patientsR *store.PatientRepo,
+	apptR *store.AppointmentRepo,
 ) *Registry {
 	return &Registry{
 		db:        db,
@@ -82,12 +79,7 @@ func (r *Registry) forClinic(ctx context.Context, clinicID uuid.UUID) (Scheduler
 
 	switch clinic.SchedulerType {
 	case "local", "mock":
-		s = &LocalScheduler{
-			doctorsR:  r.doctorsR,
-			patientsR: r.patientsR,
-			apptR:     r.apptR,
-			clinicsR:  r.clinicsR,
-		}
+		s = NewLocalScheduler(r.doctorsR, r.patientsR, r.apptR, r.clinicsR)
 	case "macdent":
 		s = &Service{db: r.db, http: r.httpCl}
 	default:

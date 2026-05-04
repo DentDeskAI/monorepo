@@ -7,10 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/dentdesk/dentdesk/internal/appointments"
-	"github.com/dentdesk/dentdesk/internal/conversations"
-	"github.com/dentdesk/dentdesk/internal/doctors"
-	"github.com/dentdesk/dentdesk/internal/scheduler"
+	"github.com/dentdesk/dentdesk/internal/scheduling"
+	"github.com/dentdesk/dentdesk/internal/store"
 )
 
 var (
@@ -23,17 +21,17 @@ var (
 // reads (list/get) are the responsibility of Scheduler and are called
 // directly from handlers.
 type SchedulingService struct {
-	Appointments  *appointments.Repo
-	Conversations *conversations.Repo
-	Sched         scheduler.Scheduler
-	Doctors       *doctors.Repo
+	Appointments  *store.AppointmentRepo
+	Conversations *store.ConversationRepo
+	Sched         scheduling.Scheduler
+	Doctors       *store.DoctorRepo
 }
 
 func NewSchedulingService(
-	apptRepo *appointments.Repo,
-	convRepo *conversations.Repo,
-	sched scheduler.Scheduler,
-	doctorsRepo *doctors.Repo,
+	apptRepo *store.AppointmentRepo,
+	convRepo *store.ConversationRepo,
+	sched scheduling.Scheduler,
+	doctorsRepo *store.DoctorRepo,
 ) *SchedulingService {
 	return &SchedulingService{
 		Appointments:  apptRepo,
@@ -64,8 +62,8 @@ func (s *SchedulingService) SyncDoctors(ctx context.Context, clinicID uuid.UUID)
 	return len(list), nil
 }
 
-// GetSlots normalises the time range and forwards to the scheduler.
-func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, from, to *time.Time, specialty string) ([]scheduler.Slot, error) {
+// GetSlots normalises the time range and forwards to the scheduling.
+func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, from, to *time.Time, specialty string) ([]scheduling.Slot, error) {
 	start := time.Now()
 	end := time.Now().Add(7 * 24 * time.Hour)
 	if from != nil && to != nil {
@@ -77,7 +75,7 @@ func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, fr
 		return nil, err
 	}
 	if slots == nil {
-		return []scheduler.Slot{}, nil
+		return []scheduling.Slot{}, nil
 	}
 	return slots, nil
 }
@@ -85,11 +83,11 @@ func (s *SchedulingService) GetSlots(ctx context.Context, clinicID uuid.UUID, fr
 // CreateAppointment validates the time range and persists the appointment in
 // our local DB (the canonical record). External-system push is a separate
 // concern handled by the integration layer.
-func (s *SchedulingService) CreateAppointment(ctx context.Context, clinicID uuid.UUID, patientID uuid.UUID, doctorID, chairID *uuid.UUID, startsAt, endsAt time.Time, service *string) (*appointments.Appointment, error) {
+func (s *SchedulingService) CreateAppointment(ctx context.Context, clinicID uuid.UUID, patientID uuid.UUID, doctorID, chairID *uuid.UUID, startsAt, endsAt time.Time, service *string) (*store.Appointment, error) {
 	if !endsAt.After(startsAt) {
 		return nil, ErrInvalidRange
 	}
-	a := &appointments.Appointment{
+	a := &store.Appointment{
 		ClinicID:  clinicID,
 		PatientID: patientID,
 		DoctorID:  doctorID,
@@ -103,7 +101,7 @@ func (s *SchedulingService) CreateAppointment(ctx context.Context, clinicID uuid
 	return s.Appointments.Create(ctx, a)
 }
 
-func (s *SchedulingService) GetAppointment(ctx context.Context, id uuid.UUID) (*appointments.Appointment, error) {
+func (s *SchedulingService) GetAppointment(ctx context.Context, id uuid.UUID) (*store.Appointment, error) {
 	return s.Appointments.Get(ctx, id)
 }
 
@@ -117,7 +115,7 @@ func (s *SchedulingService) UpdateAppointmentStatus(ctx context.Context, id uuid
 	return s.Appointments.SetStatus(ctx, id, status)
 }
 
-func (s *SchedulingService) GetConversation(ctx context.Context, id uuid.UUID) (*conversations.Conversation, error) {
+func (s *SchedulingService) GetConversation(ctx context.Context, id uuid.UUID) (*store.Conversation, error) {
 	return s.Conversations.Get(ctx, id)
 }
 

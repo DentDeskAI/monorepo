@@ -1,4 +1,8 @@
-package scheduler
+package scheduling
+
+// LocalScheduler implements Scheduler using local PostgreSQL tables.
+// Used for clinics with scheduler_type = 'local' or 'mock'.
+// Status codes use the same integer convention as MacDent for API compatibility.
 
 import (
 	"context"
@@ -7,14 +11,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/dentdesk/dentdesk/internal/appointments"
-	"github.com/dentdesk/dentdesk/internal/clinics"
-	"github.com/dentdesk/dentdesk/internal/doctors"
-	"github.com/dentdesk/dentdesk/internal/patients"
+	"github.com/dentdesk/dentdesk/internal/store"
 )
 
-// localStatusToInt maps local DB appointment status strings to Macdent integer codes.
-// The frontend/dashboard expect these integer codes.
+// localStatusToInt maps local DB appointment status strings to MacDent integer codes.
 var localStatusToInt = map[string]int{
 	"scheduled": 0,
 	"confirmed": 1,
@@ -34,15 +34,19 @@ var intToLocalStatus = map[int]string{
 	6: "scheduled", // "late" → keep scheduled
 }
 
-const macdentDateLayout = "02.01.2006 15:04:05"
+const localDateLayout = "02.01.2006 15:04:05"
 
-// LocalScheduler implements Scheduler using local PostgreSQL tables.
-// Used for clinics with scheduler_type = 'local' or 'mock'.
+// LocalScheduler is the local PostgreSQL scheduling backend.
 type LocalScheduler struct {
-	doctorsR  *doctors.Repo
-	patientsR *patients.Repo
-	apptR     *appointments.Repo
-	clinicsR  *clinics.Repo
+	doctorsR  *store.DoctorRepo
+	patientsR *store.PatientRepo
+	apptR     *store.AppointmentRepo
+	clinicsR  *store.ClinicRepo
+}
+
+// NewLocalScheduler constructs a LocalScheduler backed by the given repos.
+func NewLocalScheduler(doctorsR *store.DoctorRepo, patientsR *store.PatientRepo, apptR *store.AppointmentRepo, clinicsR *store.ClinicRepo) *LocalScheduler {
+	return &LocalScheduler{doctorsR: doctorsR, patientsR: patientsR, apptR: apptR, clinicsR: clinicsR}
 }
 
 // ── doctors ──────────────────────────────────────────────────────────────────
@@ -72,7 +76,7 @@ func (s *LocalScheduler) GetDoctor(ctx context.Context, clinicID uuid.UUID, id s
 	return &out, nil
 }
 
-func localDoctorToScheduler(d doctors.Doctor) Doctor {
+func localDoctorToScheduler(d store.Doctor) Doctor {
 	specs := []string{}
 	if d.Specialty != nil && *d.Specialty != "" {
 		specs = append(specs, *d.Specialty)
@@ -122,7 +126,7 @@ func (s *LocalScheduler) CreatePatient(ctx context.Context, clinicID uuid.UUID, 
 	return &out, nil
 }
 
-func localPatientToScheduler(p patients.Patient) Patient {
+func localPatientToScheduler(p store.Patient) Patient {
 	name := ""
 	if p.Name != nil {
 		name = *p.Name
@@ -160,7 +164,7 @@ func (s *LocalScheduler) ListAppointments(ctx context.Context, clinicID uuid.UUI
 	}
 	out := make([]Appointment, 0, len(list))
 	for _, a := range list {
-		out = append(out, localApptToScheduler(a, s))
+		out = append(out, localApptToScheduler(a))
 	}
 	return &AppointmentsResponse{Appointments: out}, nil
 }
@@ -187,7 +191,6 @@ func (s *LocalScheduler) GetAppointmentByID(ctx context.Context, clinicID uuid.U
 	p, err2 := s.patientsR.Get(ctx, a.PatientID)
 	if err2 == nil {
 		patientSeqID = p.SeqID
-		patientName = ""
 		if p.Name != nil {
 			patientName = *p.Name
 		}
@@ -200,12 +203,7 @@ func (s *LocalScheduler) GetAppointmentByID(ctx context.Context, clinicID uuid.U
 	}
 
 	return &AppointmentDetail{
-		ID:      a.SeqID,
-		Date:    a.StartsAt.Format("02.01.2006"),
-		Start:   a.StartsAt.Format(macdentDateLayout),
-		End:     a.EndsAt.Format(macdentDateLayout),
-		Status:  localStatusToInt[a.Status],
-		Zhaloba: service,
+		ID: a.SeqID,
 		Doctor: AppointmentDoctorRef{
 			ID:   doctorSeqID,
 			Name: doctorName,
@@ -215,11 +213,16 @@ func (s *LocalScheduler) GetAppointmentByID(ctx context.Context, clinicID uuid.U
 			Name:  patientName,
 			Phone: patientPhone,
 		},
+		Date:    a.StartsAt.Format("02.01.2006"),
+		Start:   a.StartsAt.Format(localDateLayout),
+		End:     a.EndsAt.Format(localDateLayout),
+		Status:  localStatusToInt[a.Status],
+		Zhaloba: service,
 	}, nil
 }
 
 func (s *LocalScheduler) CreateAppointment(ctx context.Context, req BookRequest) (*BookResult, error) {
-	a, err := s.apptR.Create(ctx, &appointments.Appointment{
+	a, err := s.apptR.Create(ctx, &store.Appointment{
 		ClinicID:  req.ClinicID,
 		PatientID: req.PatientID,
 		DoctorID:  &req.DoctorID,
@@ -247,7 +250,7 @@ func (s *LocalScheduler) CreateScheduleAppointment(ctx context.Context, clinicID
 		return nil, fmt.Errorf("patient %d not found", p.PatientID)
 	}
 	service := p.Zhaloba
-	a, err := s.apptR.Create(ctx, &appointments.Appointment{
+	a, err := s.apptR.Create(ctx, &store.Appointment{
 		ClinicID:  clinicID,
 		PatientID: pat.ID,
 		DoctorID:  &doc.ID,
@@ -268,7 +271,7 @@ func (s *LocalScheduler) UpdateAppointment(ctx context.Context, clinicID uuid.UU
 	if err != nil {
 		return fmt.Errorf("appointment %d not found", id)
 	}
-	f := appointments.UpdateFields{
+	f := store.AppointmentUpdateFields{
 		StartsAt: p.Start,
 		EndsAt:   p.End,
 	}
@@ -315,7 +318,7 @@ func (s *LocalScheduler) SendAppointmentRequest(ctx context.Context, clinicID uu
 	if p.PatientName != "" && (pat.Name == nil || *pat.Name == "") {
 		_ = s.patientsR.UpdateName(ctx, pat.ID, p.PatientName)
 	}
-	a, err := s.apptR.Create(ctx, &appointments.Appointment{
+	a, err := s.apptR.Create(ctx, &store.Appointment{
 		ClinicID:  clinicID,
 		PatientID: pat.ID,
 		StartsAt:  p.Start,
@@ -342,7 +345,7 @@ func (s *LocalScheduler) GetFreeSlots(ctx context.Context, clinicID uuid.UUID, f
 	}
 	wh := parseWorkingHours(clinic.WorkingHours)
 
-	var docList []doctors.Doctor
+	var docList []store.Doctor
 	if specialty != "" {
 		docList, err = s.doctorsR.FindBySpecialty(ctx, clinicID, specialty)
 	} else {
@@ -407,7 +410,7 @@ func slotOverlapsBooked(docID uuid.UUID, start, end time.Time, bookedByDoctor ma
 	return false
 }
 
-// ── rashodi / history ─────────────────────────────────────────────────────────
+// ── revenue / history ─────────────────────────────────────────────────────────
 
 // GetRevenue returns empty — local clinics have no financial transaction data.
 func (s *LocalScheduler) GetRevenue(_ context.Context, _ uuid.UUID, _, _ time.Time) ([]RevenueRecord, error) {
@@ -420,7 +423,7 @@ func (s *LocalScheduler) GetHistory(ctx context.Context, clinicID uuid.UUID, fro
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-func localApptToScheduler(a appointments.Appointment, _ *LocalScheduler) Appointment {
+func localApptToScheduler(a store.Appointment) Appointment {
 	doctorSeqID := 0
 	if a.DoctorSeqID != nil {
 		doctorSeqID = *a.DoctorSeqID
@@ -429,7 +432,6 @@ func localApptToScheduler(a appointments.Appointment, _ *LocalScheduler) Appoint
 	if a.PatientSeqID != nil {
 		patientSeqID = *a.PatientSeqID
 	}
-
 	service := ""
 	if a.Service != nil {
 		service = *a.Service
@@ -443,8 +445,8 @@ func localApptToScheduler(a appointments.Appointment, _ *LocalScheduler) Appoint
 		Doctor:  doctorSeqID,
 		Patient: patientSeqID,
 		Date:    a.StartsAt.Format("02.01.2006"),
-		Start:   a.StartsAt.Format(macdentDateLayout),
-		End:     a.EndsAt.Format(macdentDateLayout),
+		Start:   a.StartsAt.Format(localDateLayout),
+		End:     a.EndsAt.Format(localDateLayout),
 		Status:  status,
 		Zhaloba: service,
 		Comment: "",
